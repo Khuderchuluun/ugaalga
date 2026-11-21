@@ -48,6 +48,11 @@ button:disabled{opacity:.6}
 .step .no{flex:none;width:30px;height:30px;border-radius:50%;background:var(--blue);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center}
 .step p{margin:3px 0 0}
 h2{font-size:18px;margin:0 0 12px}
+.it .pr{font-weight:800;white-space:nowrap}
+.xr{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid #EDF1F6}
+.xr:first-of-type{border-top:0}
+.xr b{font-weight:800;white-space:nowrap}
+.sub2{font-size:15px;font-weight:800;margin:18px 0 4px}
 .csel{width:100%;font:inherit;font-size:17px;font-weight:700;padding:12px 14px;border:2px solid var(--line);border-radius:12px;background:#fff;color:var(--ink);margin-bottom:12px}
 .foot{text-align:center;color:var(--muted);font-size:13px;margin-top:18px}
 [hidden]{display:none!important}
@@ -120,27 +125,35 @@ h2{font-size:18px;margin:0 0 12px}
   function list(bal,car){
     var hasCar=(data.cars||[]).length>0;
     var svc=(data.svc||[]).filter(function(x){return x&&x.c>0&&(typeof x.k!=='number'||x.k===car);})
-      .map(function(x){return typeof x.k==='number'?{n:x.g,g:'',c:x.c}:x;}), groups=[], by={};
-    if(hasCar&&car<0) return '<div class="hint" style="margin:0">Машины ангиллаа сонгоход үнэгүй угаалга бүрийн оноо гарна.</div>';
+      .map(function(x){return typeof x.k==='number'?{n:x.g,g:'',c:x.c,pr:x.pr}:x;}), groups=[], by={};
+    if(hasCar&&car<0) return '<div class="hint" style="margin:0">Машины ангиллаа сонгоход үнэ болон үнэгүй угаалгын оноо гарна.</div>';
     if(!svc.length) return '<div class="hint" style="margin:0">Мэдээлэл алга.</div>';
     svc.forEach(function(x){ var g=x.g||''; if(!(g in by)){ by[g]=[]; groups.push(g); } by[g].push(x); });
     return groups.map(function(g){
       var solo=by[g].length===1&&by[g][0].n===g;
       return (g&&!solo?'<div class="g">'+esc(g)+'</div>':'')+by[g].sort(function(a,b){return a.c-b.c;}).map(function(x){
         var ok=bal>=x.c, pct=Math.min(100,Math.round(bal/x.c*100));
-        return '<div class="it'+(ok?' ok':'')+'"><div class="r"><span class="nm">'+esc(x.n)+'</span><span class="c">'+num(x.c)+' оноо</span></div>'+
-          '<div class="bar"><i style="width:'+pct+'%"></i></div>'+
-          '<div class="st">'+(ok?'✓ Үнэгүй авах боломжтой':num(x.c-bal)+' оноо дутуу')+'</div></div>';
+        var priced=x.pr>0, off=data.on===0;
+        return '<div class="it'+(ok&&!off?' ok':'')+'"><div class="r"><span class="nm">'+esc(x.n)+'</span>'+
+          (priced?'<span class="pr">'+num(x.pr)+'₮</span>':'<span class="c">'+num(x.c)+' оноо</span>')+'</div>'+
+          (off?'':'<div class="bar"><i style="width:'+pct+'%"></i></div>'+
+          '<div class="st">'+(ok?'✓ Үнэгүй авах боломжтой'+(priced?' ('+num(x.c)+' оноо)':''):(priced?num(x.c)+' оноогоор үнэгүй · '+num(x.c-bal)+' дутуу':num(x.c-bal)+' оноо дутуу'))+'</div>')+'</div>';
       }).join('');
     }).join('');
+  }
+  function extras(car){
+    var xs=(data.xs||[]).filter(function(x){return x&&x.pr>0&&(typeof x.k!=='number'||x.k===car);});
+    if(!xs.length||((data.cars||[]).length&&car<0)) return '';
+    return '<div class="sub2">Нэмэлт үйлчилгээ</div>'+xs.map(function(x){return '<div class="xr"><span>'+esc(x.n)+'</span><b>+'+num(x.pr)+'₮</b></div>';}).join('');
   }
   function render(scroll){
     var off=data.on===0, cars=data.cars||[];
     var sel=cars.length?'<select class="csel" id="carSel" aria-label="Машины ангилал">'+(cur.car<0?'<option value="-1">Машины ангилал сонгох</option>':'')+
       cars.map(function(n,i){return '<option value="'+i+'"'+(i===cur.car?' selected':'')+'>'+esc(n)+'</option>';}).join('')+'</select>':'';
+    var priced=(data.svc||[]).some(function(x){return x&&x.pr>0;});
     var html='<div class="card bal"><div class="n">'+num(cur.bal)+'</div><div class="u">оноо</div><div class="pl">'+esc(cur.raw)+'</div></div>'+
-      (off?'<div class="card msg">Урамшуулал одоогоор түр зогссон байна.</div>':
-      '<div class="card"><h2>Үнэгүй авахад хэрэгтэй оноо</h2>'+sel+list(cur.bal,cur.car)+'</div>');
+      (off?'<div class="card msg">Урамшуулал одоогоор түр зогссон байна.</div>':'')+
+      '<div class="card"><h2>'+(priced?'Таны машины үнэ':'Үнэгүй авахад хэрэгтэй оноо')+'</h2>'+sel+list(cur.bal,cur.car)+extras(cur.car)+'</div>';
     if(scroll) show(html); else $('res').innerHTML=html;
   }
   $('res').addEventListener('change',function(e){ if(e.target.id==='carSel'&&cur){ cur.car=+e.target.value; render(false); } });
