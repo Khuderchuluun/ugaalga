@@ -818,6 +818,26 @@ function applyPreset(){
   db.extras=PM_PRESET.other.map(function(o,i){return {id:'xo'+(i+1),name:o[0],price:o[1],g:''};});
   syncMatrix();
 }
+/* Ангилал бүртгэгдээгүй хуучин бүртгэлээс машины ангиллыг таах: угаалгын нэр дэх машины нэр, эсвэл төлсөн үнэ нэг л ангилалтай таарвал */
+function guessCar(pk){
+  var lc=lastCar(pk); if(lc) return lc;
+  if(!db.cars.length) return null;
+  var fw=function(t){ return String(t||'').toLowerCase().split(/[\s·]+/)[0]; };
+  var recs=db.records.filter(function(r){return !r.del&&plateKey(r.plate)===pk;})
+    .sort(function(a,b){return ((b.date||'')+(b.time||'')).localeCompare((a.date||'')+(a.time||''));});
+  for(var i=0;i<recs.length;i++){
+    var r=recs[i], lab=String(r.service||'').toLowerCase();
+    var byName=db.cars.filter(function(c){return c.name&&lab.indexOf(c.name.toLowerCase())>=0;})
+      .sort(function(a,b){return b.name.length-a.name.length;});
+    if(byName.length===1||(byName.length>1&&byName[0].name.length>byName[1].name.length)) return byName[0].id;
+    var base=(r.free||r.own)?(+r.list||0):((r.extras&&r.extras.length)?(+r.base||0):(+r.price||0));
+    if(!(base>0)) continue;
+    var ks=db.cols.filter(function(k){return k.k!=='x'&&(r.group===k.name||fw(lab)===fw(k.name));});
+    var byPrice=db.cars.filter(function(c){return ks.some(function(k){return mPrice(c.id,k.id)===base;});});
+    if(byPrice.length===1) return byPrice[0].id;
+  }
+  return null;
+}
 function lastCar(pk){
   var best=null, bt='';
   db.records.forEach(function(r){ if(r.del||!r.carId||plateKey(r.plate)!==pk) return; var t=(r.date||'')+' '+(r.time||''); if(t>bt){bt=t;best=r.carId;} });
@@ -1180,7 +1200,7 @@ $('splitBox').addEventListener('click',function(e){
 });
 function autoCar(k){
   if(editId||!db.cars.length||sel.carManual) return;
-  var lc=k.length>=4?lastCar(k):null;
+  var lc=k.length>=4?guessCar(k):null;
   if(lc){ if(lc!==sel.car){ setCar(lc,false); } sel.carAuto=true; drawCars(); }
   else if(sel.carAuto){ sel.carAuto=false; setCar(null,false); }
 }
@@ -1951,7 +1971,7 @@ function pubData(){
   var salt=Math.random().toString(36).slice(2,10)+Date.now().toString(36), now=new Date(), keys=Object.keys(by), p={};
   return Promise.all(keys.map(function(k){
     var L=loyalty(k); if(!L.total) return null;
-    var lc=lastCar(k), ci=lc?db.cars.map(function(c){return c.id;}).indexOf(lc):-1;
+    var lc=guessCar(k), ci=lc?db.cars.map(function(c){return c.id;}).indexOf(lc):-1;
     return sha16(salt+'|'+k).then(function(h){ p[h]=ci>=0?[L.bal,ci]:L.bal; });
   })).then(function(){
     return {v:1,at:dstr(now)+' '+tstr(now),rate:db.ptRate,paid:db.loyPaid,on:db.loyOn?1:0,s:salt,
@@ -2474,7 +2494,7 @@ resetForm(); exReset(); refreshAll(); applyRole(); checkJoinHash();
 </script>
 <script>
 (function(){
-  var APP_VER='2026-11-22e';
+  var APP_VER='2026-11-22f';
   var vd=document.createElement('div'); vd.className='hint'; vd.style.cssText='text-align:center;margin:4px 0 12px';
   vd.textContent='Аппын хувилбар: '+APP_VER;
   document.getElementById('p-set').appendChild(vd);
