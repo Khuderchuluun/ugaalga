@@ -169,7 +169,6 @@ h2{font-size:18px;margin:0 0 12px}
     var raw=$('pl').value, k=key(raw);
     if(k.length<3){ $('pl').focus(); return; }
     var btn=$('go'); btn.disabled=true;
-    try{ localStorage.setItem('onoo_pl',raw.trim()); }catch(x){}
     load().then(function(){
       var vs=variants(k);
       return Promise.all(vs.map(function(v){return sha16(data.s+'|'+v);})).then(function(hs){
@@ -187,7 +186,9 @@ h2{font-size:18px;margin:0 0 12px}
       show('<div class="card msg"><b>Мэдээлэл ачаалж чадсангүй</b>Интернэт холболтоо шалгаад дахин оролдоно уу.</div>');
     }).then(function(){ btn.disabled=false; });
   });
-  try{ var s=localStorage.getItem('onoo_pl'); if(s) $('pl').value=s; }catch(x){}
+  /* Талбар үргэлж хоосон: өмнө хадгалсан дугаарыг устгана */
+  try{ localStorage.removeItem('onoo_pl'); }catch(x){}
+  $('pl').value='';
   load().catch(function(){});
 })();
 </script>
