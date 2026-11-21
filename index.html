@@ -481,9 +481,11 @@ body.worker .rec{cursor:default}
     <h2>Хүлээн авсан утаснууд</h2>
     <div id="recvList"></div>
   </div>
-  <div class="card adm">
-    <h2>Байнгын үйлчлүүлэгчийн урамшуулал</h2>
-    <label class="chk"><input type="checkbox" id="loyOn"> Урамшуулал идэвхтэй (оноогоор)</label>
+  <div class="card adm acc-card">
+    <details class="acc" id="accLoy">
+      <summary><span class="at">Урамшуулал ба онооны хуудас</span><span class="as" id="accLoySum"></span><span class="car" aria-hidden="true">▼</span></summary>
+      <div class="acc-body">
+    <label class="chk" style="margin-top:0"><input type="checkbox" id="loyOn"> Урамшуулал идэвхтэй (оноогоор)</label>
     <div class="row" style="align-items:center;margin-top:var(--s3)">
       <div style="flex:2">1 оноо хэдэн ₮ вэ?</div>
       <div><input id="ptRate" type="number" inputmode="numeric" min="100" step="100"></div>
@@ -493,22 +495,21 @@ body.worker .rec{cursor:default}
       <div><input id="loyN" type="number" inputmode="numeric" min="1" max="50" step="1"></div>
     </div>
     <div class="hint" id="loyHint"></div>
-  </div>
-  <div class="card adm">
-    <h2>Үйлчлүүлэгчийн онооны хуудас</h2>
+    <div style="border-top:1px solid var(--line,#e3e8ef);margin:var(--s4) 0 var(--s3)"></div>
+    <div style="font-size:15px;font-weight:700;margin-bottom:4px">Үйлчлүүлэгчийн онооны хуудас</div>
     <div class="hint" style="margin:0 0 4px">Үйлчлүүлэгч доорх хаягаар орж улсын дугаараа оруулаад оноогоо харна. «Оноо нийтлэх» дарахад хамгийн сүүлийн оноо 1–2 минутын дараа хуудсанд гарна. Зөвхөн дугаар ба оноо нийтлэгдэнэ (нэр, утас, түүх орохгүй).</div>
-    <div class="hint" style="margin:0 0 8px"><a id="pubLink" target="_blank" rel="noopener" style="color:var(--acc,#0a6fc2);font-weight:700;word-break:break-all"></a></div>
+    <div class="hint" style="margin:0 0 8px"><a id="pubLink" target="_blank" rel="noopener" style="color:var(--brand,#0a6fc2);font-weight:700;word-break:break-all"></a></div>
     <button class="btn" id="pubBtn">Оноо нийтлэх</button>
     <div class="hint" id="pubInfo"></div>
-    <details class="acc" id="accTok" style="margin-top:var(--s2)">
-      <summary><span class="at">GitHub түлхүүр</span><span class="as" id="tokSum"></span><span class="car" aria-hidden="true">▼</span></summary>
-      <div class="acc-body">
-        <div class="hint" style="margin:0 0 8px">Нэг удаа оруулна. Энэ утсан дээр л хадгалагдах ба нөөц файл, илгээх файлд орохгүй.</div>
-        <input id="pubTok" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="github_pat_…">
-        <div class="row" style="margin-top:var(--s2)">
-          <button class="btn sm" id="tokSave">Хадгалах</button>
-          <button class="btn ghost sm" id="tokDel">Устгах</button>
-        </div>
+    <button class="btn ghost sm" id="tokToggle" style="margin-top:var(--s2)">GitHub түлхүүр</button>
+    <div id="tokBox" hidden style="margin-top:var(--s2)">
+      <div class="hint" style="margin:0 0 8px">Нэг удаа оруулна. Энэ утсан дээр л хадгалагдах ба нөөц файл, илгээх файлд орохгүй.</div>
+      <input id="pubTok" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="github_pat_…">
+      <div class="row" style="margin-top:var(--s2)">
+        <button class="btn sm" id="tokSave">Хадгалах</button>
+        <button class="btn ghost sm" id="tokDel">Устгах</button>
+      </div>
+    </div>
       </div>
     </details>
   </div>
@@ -1748,14 +1749,16 @@ function pubUrl(){
 }
 function drawPub(){
   var u=pubUrl(), a=$('pubLink'); a.href=u; a.textContent=u.replace(/^https:\/\//,'');
-  var t=lsGet(TOK_KEY); $('tokSum').textContent=t?'оруулсан':'оруулаагүй';
-  if(!t) $('accTok').open=true;
+  var t=lsGet(TOK_KEY); $('tokToggle').textContent='GitHub түлхүүр · '+(t?'оруулсан':'оруулаагүй');
+  if(!t) $('tokBox').hidden=false;
+  $('accLoySum').textContent=db.loyOn?'Идэвхтэй · '+money(db.ptRate)+' = 1 оноо':'Унтраалттай';
   var at=lsGet(PUB_KEY); $('pubInfo').textContent=at?'Сүүлд нийтэлсэн: '+at:'Одоогоор нийтлээгүй.';
 }
 $('tokSave').addEventListener('click',function(){
   var v=$('pubTok').value.trim(); if(!v){ toast('Түлхүүрээ оруулна уу'); return; }
-  lsSet(TOK_KEY,v); $('pubTok').value=''; $('accTok').open=false; drawPub(); toast('Түлхүүр хадгалагдлаа');
+  lsSet(TOK_KEY,v); $('pubTok').value=''; $('tokBox').hidden=true; drawPub(); toast('Түлхүүр хадгалагдлаа');
 });
+$('tokToggle').addEventListener('click',function(){ $('tokBox').hidden=!$('tokBox').hidden; });
 $('tokDel').addEventListener('click',function(){ lsSet(TOK_KEY,''); $('pubTok').value=''; drawPub(); toast('Түлхүүр устлаа'); });
 function sha16(s){
   return crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)).then(function(b){
@@ -1781,7 +1784,7 @@ var pubBusy=false;
 $('pubBtn').addEventListener('click',function(){
   if(pubBusy) return;
   var tok=lsGet(TOK_KEY);
-  if(!tok){ $('accTok').open=true; notify('Эхлээд GitHub түлхүүрээ оруулна уу.'); return; }
+  if(!tok){ $('tokBox').hidden=false; notify('Эхлээд GitHub түлхүүрээ оруулна уу.'); return; }
   if(!window.crypto||!crypto.subtle){ notify('Энэ хөтөч дээр нийтлэх боломжгүй байна. Аппаа https хаягаар нээнэ үү.'); return; }
   if(navigator.onLine===false){ notify('Интернэт холболт алга байна.'); return; }
   var R=pubRepo(), api='https://api.github.com/repos/'+R.o+'/'+R.r+'/contents/onoo/points.json';
@@ -2282,7 +2285,7 @@ resetForm(); exReset(); refreshAll(); applyRole(); checkJoinHash();
 </script>
 <script>
 (function(){
-  var APP_VER='2026-11-22a';
+  var APP_VER='2026-11-22b';
   var vd=document.createElement('div'); vd.className='hint'; vd.style.cssText='text-align:center;margin:4px 0 12px';
   vd.textContent='Аппын хувилбар: '+APP_VER;
   document.getElementById('p-set').appendChild(vd);
