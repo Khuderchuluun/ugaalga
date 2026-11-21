@@ -1,4 +1,4 @@
-var C='ugaalga-v32';
+var C='ugaalga-v33';
 var FILES=['./','index.html','manifest.webmanifest','icon-180.png','icon-512.png'];
 
 /* Суулгахдаа хөтчийн кэшийг алгасаж, сервер дээрх хамгийн шинэ файлуудыг татна */
@@ -27,6 +27,8 @@ self.addEventListener('fetch',function(e){
   var req=e.request;
   if(req.method!=='GET') return;
   if(new URL(req.url).origin!==self.location.origin) return;
+  /* Үйлчлүүлэгчийн онооны хуудсыг (onoo/) кэшлэхгүй: үргэлж шинэ оноо харуулна */
+  if(/\/onoo\//.test(new URL(req.url).pathname)) return;
 
   var isPage=req.mode==='navigate'||/\/(index\.html)?$/.test(new URL(req.url).pathname);
   if(isPage){

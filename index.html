@@ -494,6 +494,24 @@ body.worker .rec{cursor:default}
     </div>
     <div class="hint" id="loyHint"></div>
   </div>
+  <div class="card adm">
+    <h2>Үйлчлүүлэгчийн онооны хуудас</h2>
+    <div class="hint" style="margin:0 0 4px">Үйлчлүүлэгч доорх хаягаар орж улсын дугаараа оруулаад оноогоо харна. «Оноо нийтлэх» дарахад хамгийн сүүлийн оноо 1–2 минутын дараа хуудсанд гарна. Зөвхөн дугаар ба оноо нийтлэгдэнэ (нэр, утас, түүх орохгүй).</div>
+    <div class="hint" style="margin:0 0 8px"><a id="pubLink" target="_blank" rel="noopener" style="color:var(--acc,#0a6fc2);font-weight:700;word-break:break-all"></a></div>
+    <button class="btn" id="pubBtn">Оноо нийтлэх</button>
+    <div class="hint" id="pubInfo"></div>
+    <details class="acc" id="accTok" style="margin-top:var(--s2)">
+      <summary><span class="at">GitHub түлхүүр</span><span class="as" id="tokSum"></span><span class="car" aria-hidden="true">▼</span></summary>
+      <div class="acc-body">
+        <div class="hint" style="margin:0 0 8px">Нэг удаа оруулна. Энэ утсан дээр л хадгалагдах ба нөөц файл, илгээх файлд орохгүй.</div>
+        <input id="pubTok" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="github_pat_…">
+        <div class="row" style="margin-top:var(--s2)">
+          <button class="btn sm" id="tokSave">Хадгалах</button>
+          <button class="btn ghost sm" id="tokDel">Устгах</button>
+        </div>
+      </div>
+    </details>
+  </div>
   <div class="card adm acc-card">
     <details class="acc" id="accSvc">
       <summary><span class="at">Угаалгын төрөл ба үнэ</span><span class="as" id="accSvcSum"></span><span class="car" aria-hidden="true">▼</span></summary>
@@ -1384,6 +1402,7 @@ function drawSettings(){
     return '<div class="recv"><span><b>'+esc(dv)+'</b> · '+n+' бүртгэл</span><span>сүүлд '+esc(x.last||'')+'</span></div>';
   }).join('');
   $('backupInfo').textContent='Нийт '+live().length+' бүртгэл · сүүлийн нөөц: '+(db.lastBackup||'аваагүй');
+  drawPub();
 }
 $('svcSet').addEventListener('change',function(e){
   var t=e.target;
@@ -1712,6 +1731,89 @@ $('sendSet').addEventListener('click',function(){
     JSON.stringify({app:KEY,kind:'settings',at:dstr(now)+' '+tstr(now),services:db.services,workers:db.workers,extras:db.extras,
       loyOn:db.loyOn,loyN:db.loyN,loyPaid:db.loyPaid,ptRate:db.ptRate,cust:custSummary(),notes:notesSummary(),dup:Object.keys(db.dupIds)}),'text/plain');
 });
+/* ---------- үйлчлүүлэгчийн онооны хуудас (onoo/) руу нийтлэх ---------- */
+/* Түлхүүр, сүүлд нийтэлсэн огноог db-ээс тусад нь хадгална: нөөц/илгээх файлд орохгүй */
+var TOK_KEY='ugaalga_tok', PUB_KEY='ugaalga_pub';
+function lsGet(k){ try{ return localStorage.getItem(k)||''; }catch(e){ return ''; } }
+function lsSet(k,v){ try{ if(v) localStorage.setItem(k,v); else localStorage.removeItem(k); }catch(e){} }
+function pubRepo(){
+  var h=location.hostname, seg=location.pathname.split('/').filter(Boolean)[0]||'';
+  if(/\.github\.io$/i.test(h)&&seg&&!/\.html?$/i.test(seg)) return {o:h.split('.')[0],r:seg};
+  return {o:'Khuderchuluun',r:'ugaalga'};
+}
+function pubUrl(){
+  var R=pubRepo();
+  if(/\.github\.io$/i.test(location.hostname)) return location.origin+location.pathname.replace(/[^\/]*$/,'')+'onoo/';
+  return 'https://'+R.o.toLowerCase()+'.github.io/'+R.r+'/onoo/';
+}
+function drawPub(){
+  var u=pubUrl(), a=$('pubLink'); a.href=u; a.textContent=u.replace(/^https:\/\//,'');
+  var t=lsGet(TOK_KEY); $('tokSum').textContent=t?'оруулсан':'оруулаагүй';
+  if(!t) $('accTok').open=true;
+  var at=lsGet(PUB_KEY); $('pubInfo').textContent=at?'Сүүлд нийтэлсэн: '+at:'Одоогоор нийтлээгүй.';
+}
+$('tokSave').addEventListener('click',function(){
+  var v=$('pubTok').value.trim(); if(!v){ toast('Түлхүүрээ оруулна уу'); return; }
+  lsSet(TOK_KEY,v); $('pubTok').value=''; $('accTok').open=false; drawPub(); toast('Түлхүүр хадгалагдлаа');
+});
+$('tokDel').addEventListener('click',function(){ lsSet(TOK_KEY,''); $('pubTok').value=''; drawPub(); toast('Түлхүүр устлаа'); });
+function sha16(s){
+  return crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)).then(function(b){
+    return Array.prototype.map.call(new Uint8Array(b).slice(0,8),function(x){return ('0'+x.toString(16)).slice(-2);}).join('');
+  });
+}
+/* Нийтлэх өгөгдөл: дугаар бүрийн үлдэгдэл оноо (дугаарыг давстай hash болгоно) + угаалга бүрийн оноо */
+function pubData(){
+  var by={};
+  db.records.forEach(function(r){ var k=plateKey(r.plate); if(k) by[k]=1; });
+  db.ext.forEach(function(e){ if(e&&e.p) by[e.p]=1; });
+  var salt=Math.random().toString(36).slice(2,10)+Date.now().toString(36), now=new Date(), keys=Object.keys(by), p={};
+  return Promise.all(keys.map(function(k){
+    var L=loyalty(k); if(!L.total) return null;
+    return sha16(salt+'|'+k).then(function(h){ p[h]=L.bal; });
+  })).then(function(){
+    return {v:1,at:dstr(now)+' '+tstr(now),rate:db.ptRate,paid:db.loyPaid,on:db.loyOn?1:0,s:salt,
+      svc:db.services.filter(function(x){return (+x.price||0)>0;}).map(function(x){return {n:x.name,g:x.g||'',c:ptCost(x.price)};}),p:p};
+  });
+}
+function b64utf8(s){ var b=new TextEncoder().encode(s), out=''; for(var i=0;i<b.length;i+=0x8000) out+=String.fromCharCode.apply(null,b.subarray(i,i+0x8000)); return btoa(out); }
+var pubBusy=false;
+$('pubBtn').addEventListener('click',function(){
+  if(pubBusy) return;
+  var tok=lsGet(TOK_KEY);
+  if(!tok){ $('accTok').open=true; notify('Эхлээд GitHub түлхүүрээ оруулна уу.'); return; }
+  if(!window.crypto||!crypto.subtle){ notify('Энэ хөтөч дээр нийтлэх боломжгүй байна. Аппаа https хаягаар нээнэ үү.'); return; }
+  if(navigator.onLine===false){ notify('Интернэт холболт алга байна.'); return; }
+  var R=pubRepo(), api='https://api.github.com/repos/'+R.o+'/'+R.r+'/contents/onoo/points.json';
+  var H={'Authorization':'Bearer '+tok,'Accept':'application/vnd.github+json'};
+  var btn=$('pubBtn'), old=btn.textContent, data;
+  pubBusy=true; btn.disabled=true; btn.textContent='Нийтэлж байна…';
+  function fail(st){
+    var m=st===401?'Түлхүүр буруу эсвэл хугацаа нь дууссан байна. Шинэ түлхүүр үүсгээд оруулна уу.':
+      (st===403||st===404)?'Түлхүүрт "'+R.r+'" төсөлд бичих эрх алга байна. Түлхүүр үүсгэхдээ Contents: Read and write эрх өгсөн эсэхээ шалгаарай.':
+      st===409||st===422?'Сайт зэрэг шинэчлэгдэж байсан тул амжсангүй. Дахин дарна уу.':
+      'Нийтэлж чадсангүй. Интернэт холболтоо шалгаад дахин оролдоно уу.'+(st?' (алдаа '+st+')':'');
+    notify(m);
+  }
+  pubData().then(function(d){
+    data=d;
+    return fetch(api+'?t='+Date.now(),{headers:H,cache:'no-store'});
+  }).then(function(r){
+    if(r.status===404) return null;
+    if(!r.ok) throw r.status;
+    return r.json();
+  }).then(function(cur){
+    var body={message:'Оноо шинэчлэв ('+data.at+')',content:b64utf8(JSON.stringify(data))};
+    if(cur&&cur.sha) body.sha=cur.sha;
+    return fetch(api,{method:'PUT',headers:H,body:JSON.stringify(body)});
+  }).then(function(r){
+    if(!r.ok) throw r.status;
+    lsSet(PUB_KEY,data.at); drawPub();
+    notify(Object.keys(data.p).length+' машины оноо нийтлэгдлээ. 1–2 минутын дараа хуудсанд харагдана.');
+  }).catch(function(e){ fail(typeof e==='number'?e:0); })
+  .then(function(){ pubBusy=false; btn.disabled=false; btn.textContent=old; });
+});
+
 $('devName').addEventListener('change',function(){db.device=this.value.trim();save();});
 $('wipe').addEventListener('click',function(){
   ask('Бүх бүртгэлийг устгах уу? Буцаах боломжгүй.','Үргэлжлүүлэх').then(function(ok){ if(!ok) return;
@@ -2180,7 +2282,7 @@ resetForm(); exReset(); refreshAll(); applyRole(); checkJoinHash();
 </script>
 <script>
 (function(){
-  var APP_VER='2026-11-10b';
+  var APP_VER='2026-11-22a';
   var vd=document.createElement('div'); vd.className='hint'; vd.style.cssText='text-align:center;margin:4px 0 12px';
   vd.textContent='Аппын хувилбар: '+APP_VER;
   document.getElementById('p-set').appendChild(vd);

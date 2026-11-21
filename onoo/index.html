@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0E2240">
+<title>Миний оноо · Угаалгын урамшуулал</title>
+<link rel="icon" href="../icon-180.png">
+<style>
+:root{--ink:#0E2240;--muted:#56677F;--blue:#0A6FC2;--yel:#FFC93C;--ok:#178A4C;--bg:#F3F6FA;--line:#DCE5F0}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;font-size:16px;line-height:1.45;-webkit-text-size-adjust:100%}
+.top{background:var(--ink);color:#fff;padding:28px 20px 30px;text-align:center}
+.top .k{font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8FC8F2}
+.top h1{margin:8px 0 4px;font-size:30px;line-height:1.1;font-weight:900}
+.top h1 b{color:var(--yel)}
+.top .sub{display:inline-block;margin-top:12px;background:#fff;color:var(--ink);border-radius:999px;padding:6px 14px;font-weight:800;font-size:15px}
+.wrap{max-width:520px;margin:0 auto;padding:0 16px 32px}
+.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px;margin-top:16px}
+.find{margin-top:-18px;box-shadow:0 6px 20px rgba(14,34,64,.08)}
+label{display:block;font-weight:700;margin-bottom:8px}
+.in{display:flex;gap:8px}
+input{flex:1;min-width:0;font:inherit;font-size:20px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:12px 14px;border:2px solid var(--line);border-radius:12px;color:var(--ink);background:#fff}
+input:focus{outline:none;border-color:var(--blue)}
+button{font:inherit;font-weight:800;font-size:16px;border:0;border-radius:12px;background:var(--blue);color:#fff;padding:0 18px;min-height:50px;cursor:pointer}
+button:disabled{opacity:.6}
+.hint{color:var(--muted);font-size:14px;margin-top:8px}
+.bal{text-align:center;padding:22px 18px}
+.bal .n{font-size:56px;font-weight:900;line-height:1;color:var(--blue)}
+.bal .u{font-size:18px;font-weight:700;margin-top:4px}
+.bal .pl{font-size:14px;color:var(--muted);margin-top:6px}
+.g{font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:16px 0 6px}
+.g:first-child{margin-top:0}
+.it{padding:10px 0;border-top:1px solid #EDF1F6}
+.g+.it{border-top:0}
+.it .r{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.it .nm{font-weight:700}
+.it .c{font-size:14px;color:var(--muted);white-space:nowrap}
+.bar{height:8px;border-radius:99px;background:#E6EDF5;margin-top:8px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--blue);border-radius:99px}
+.st{font-size:14px;font-weight:700;margin-top:6px;color:var(--muted)}
+.it.ok .bar i{background:var(--ok)}
+.it.ok .st{color:var(--ok)}
+.msg{text-align:center;color:var(--muted)}
+.msg b{display:block;color:var(--ink);font-size:18px;margin-bottom:6px}
+.steps{display:grid;gap:12px}
+.step{display:flex;gap:12px;align-items:flex-start}
+.step .no{flex:none;width:30px;height:30px;border-radius:50%;background:var(--blue);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center}
+.step p{margin:3px 0 0}
+h2{font-size:18px;margin:0 0 12px}
+.foot{text-align:center;color:var(--muted);font-size:13px;margin-top:18px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="k">Онооны урамшуулал</div>
+  <h1 id="head">10 удаа угаалгаад<br>11 дэх нь <b>ҮНЭГҮЙ</b></h1>
+  <div class="sub" id="rateTxt">1,000₮ = 1 оноо</div>
+</div>
+<div class="wrap">
+  <form class="card find" id="f" autocomplete="off">
+    <label for="pl">Машины улсын дугаар</label>
+    <div class="in">
+      <input id="pl" placeholder="1234 УБА" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="search">
+      <button id="go" type="submit">Харах</button>
+    </div>
+    <div class="hint">Карт хэрэггүй, дугаараа оруулахад л болно.</div>
+  </form>
+
+  <div id="res" hidden></div>
+
+  <div class="card">
+    <h2>Хэрхэн ажилладаг вэ?</h2>
+    <div class="steps">
+      <div class="step"><div class="no">1</div><p>Угаалгуулах бүрдээ улсын дугаараа хэлнэ.</p></div>
+      <div class="step"><div class="no">2</div><p id="st2">Төлсөн 1,000₮ тутамд 1 оноо нэмэгдэнэ. Нэмэлт үйлчилгээ ч оноо өгнө.</p></div>
+      <div class="step"><div class="no">3</div><p>Аль нэг угаалгын оноо хүрмэгц түүнийг үнэгүй авна. Ажилтанд хэлэхэд л болно.</p></div>
+    </div>
+  </div>
+
+  <div class="foot" id="upd"></div>
+  <div class="foot">Оноо хугацаа дуусахгүй. Оноогоор зөвхөн бүтэн угаалга үнэгүй авна.</div>
+</div>
+
+<script>
+(function(){
+  var data=null, loadP=null;
+  var $=function(id){return document.getElementById(id);};
+  function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+  function num(n){return String(Math.round(n||0)).replace(/\B(?=(\d{3})+(?!\d))/g,',');}
+  /* Аппын plateKey()-тэй яг адил: том үсэг, зай ба зураас хасна */
+  function key(s){return String(s||'').toUpperCase().replace(/\s+/g,' ').trim().replace(/[\s\-]/g,'');}
+  /* Латинаар бичсэн бол кирилл рүү хөрвүүлж дахин хайна */
+  var LOOK={A:'А',B:'В',C:'С',E:'Е',H:'Н',K:'К',M:'М',O:'О',P:'Р',T:'Т',X:'Х',Y:'У'};
+  var PHON={A:'А',B:'Б',C:'Ц',D:'Д',E:'Е',F:'Ф',G:'Г',H:'Х',I:'И',J:'Ж',K:'К',L:'Л',M:'М',N:'Н',O:'О',P:'П',Q:'К',R:'Р',S:'С',T:'Т',U:'У',V:'В',W:'В',X:'Х',Y:'У',Z:'З'};
+  function conv(k,m){return k.replace(/[A-Z]/g,function(c){return m[c]||c;});}
+  function variants(k){var o=[k];[LOOK,PHON].forEach(function(m){var v=conv(k,m); if(o.indexOf(v)<0) o.push(v);}); return o;}
+  function sha16(s){
+    return crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)).then(function(b){
+      return Array.prototype.map.call(new Uint8Array(b).slice(0,8),function(x){return ('0'+x.toString(16)).slice(-2);}).join('');
+    });
+  }
+  function load(){
+    if(!loadP) loadP=fetch('points.json?t='+Date.now(),{cache:'no-store'}).then(function(r){
+      if(!r.ok) throw r.status; return r.json();
+    }).then(function(d){ data=d; header(); return d; }).catch(function(e){ loadP=null; throw e; });
+    return loadP;
+  }
+  function header(){
+    var paid=+data.paid||10, rate=+data.rate||1000;
+    $('head').innerHTML=paid+' удаа угаалгаад<br>'+(paid+1)+' дэх нь <b>ҮНЭГҮЙ</b>';
+    $('rateTxt').textContent=num(rate)+'₮ = 1 оноо';
+    $('st2').textContent='Төлсөн '+num(rate)+'₮ тутамд 1 оноо нэмэгдэнэ. Нэмэлт үйлчилгээ ч оноо өгнө.';
+    if(data.at) $('upd').textContent='Оноо сүүлд шинэчлэгдсэн: '+data.at;
+  }
+  function show(html){ var r=$('res'); r.innerHTML=html; r.hidden=false; r.scrollIntoView({behavior:'smooth',block:'start'}); }
+  function list(bal){
+    var svc=(data.svc||[]).filter(function(x){return x&&x.c>0;}), groups=[], by={};
+    svc.forEach(function(x){ var g=x.g||''; if(!(g in by)){ by[g]=[]; groups.push(g); } by[g].push(x); });
+    return groups.map(function(g){
+      var solo=by[g].length===1&&by[g][0].n===g;
+      return (g&&!solo?'<div class="g">'+esc(g)+'</div>':'')+by[g].sort(function(a,b){return a.c-b.c;}).map(function(x){
+        var ok=bal>=x.c, pct=Math.min(100,Math.round(bal/x.c*100));
+        return '<div class="it'+(ok?' ok':'')+'"><div class="r"><span class="nm">'+esc(x.n)+'</span><span class="c">'+num(x.c)+' оноо</span></div>'+
+          '<div class="bar"><i style="width:'+pct+'%"></i></div>'+
+          '<div class="st">'+(ok?'✓ Үнэгүй авах боломжтой':num(x.c-bal)+' оноо дутуу')+'</div></div>';
+      }).join('');
+    }).join('');
+  }
+  $('f').addEventListener('submit',function(e){
+    e.preventDefault();
+    var raw=$('pl').value, k=key(raw);
+    if(k.length<3){ $('pl').focus(); return; }
+    var btn=$('go'); btn.disabled=true;
+    try{ localStorage.setItem('onoo_pl',raw.trim()); }catch(x){}
+    load().then(function(){
+      var vs=variants(k);
+      return Promise.all(vs.map(function(v){return sha16(data.s+'|'+v);})).then(function(hs){
+        for(var i=0;i<hs.length;i++) if(hs[i] in data.p) return {bal:+data.p[hs[i]]||0};
+        return null;
+      });
+    }).then(function(hit){
+      if(!hit){
+        show('<div class="card msg"><b>Энэ дугаараар оноо олдсонгүй</b>Дугаараа зөв оруулсан эсэхээ шалгаарай. Саяхан анх удаа угаалгасан бол оноо тань дараагийн шинэчлэлтээр нэмэгдэнэ.</div>');
+        return;
+      }
+      var off=data.on===0;
+      show('<div class="card bal"><div class="n">'+num(hit.bal)+'</div><div class="u">оноо</div><div class="pl">'+esc(raw.trim().toUpperCase())+'</div></div>'+
+        (off?'<div class="card msg">Урамшуулал одоогоор түр зогссон байна.</div>':
+        '<div class="card"><h2>Үнэгүй авахад хэрэгтэй оноо</h2>'+list(hit.bal)+'</div>'));
+    }).catch(function(){
+      show('<div class="card msg"><b>Мэдээлэл ачаалж чадсангүй</b>Интернэт холболтоо шалгаад дахин оролдоно уу.</div>');
+    }).then(function(){ btn.disabled=false; });
+  });
+  try{ var s=localStorage.getItem('onoo_pl'); if(s) $('pl').value=s; }catch(x){}
+  load().catch(function(){});
+})();
+</script>
+</body>
+</html>
