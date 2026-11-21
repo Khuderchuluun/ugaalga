@@ -818,26 +818,44 @@ function applyPreset(){
   db.extras=PM_PRESET.other.map(function(o,i){return {id:'xo'+(i+1),name:o[0],price:o[1],g:''};});
   syncMatrix();
 }
-/* Ангилал бүртгэгдээгүй хуучин бүртгэлээс машины ангиллыг таах: угаалгын нэр дэх машины нэр, эсвэл төлсөн үнэ нэг л ангилалтай таарвал */
-function guessCar(pk){
-  var lc=lastCar(pk); if(lc) return lc;
-  if(!db.cars.length) return null;
-  var fw=function(t){ return String(t||'').toLowerCase().split(/[\s·]+/)[0]; };
-  var recs=db.records.filter(function(r){return !r.del&&plateKey(r.plate)===pk;})
-    .sort(function(a,b){return ((b.date||'')+(b.time||'')).localeCompare((a.date||'')+(a.time||''));});
-  for(var i=0;i<recs.length;i++){
-    var r=recs[i], lab=String(r.service||'').toLowerCase();
-    var byName=db.cars.filter(function(c){return c.name&&lab.indexOf(c.name.toLowerCase())>=0;})
-      .sort(function(a,b){return b.name.length-a.name.length;});
-    if(byName.length===1||(byName.length>1&&byName[0].name.length>byName[1].name.length)) return byName[0].id;
-    var base=(r.free||r.own)?(+r.list||0):((r.extras&&r.extras.length)?(+r.base||0):(+r.price||0));
-    if(!(base>0)) continue;
-    var ks=db.cols.filter(function(k){return k.k!=='x'&&(r.group===k.name||fw(lab)===fw(k.name));});
-    var byPrice=db.cars.filter(function(c){return ks.some(function(k){return mPrice(c.id,k.id)===base;});});
-    if(byPrice.length===1) return byPrice[0].id;
-  }
-  return null;
+/* Ангилал бүртгэгдээгүй хуучин бүртгэлээс машины ангиллыг таана.
+   Бүртгэл бүрээс боломжит ангиллууд: угаалгын нэр + төлсөн үнэ таарах ангиллууд, эс бол нэрэн дэх түлхүүр үг (жийп, Prius, Harrier…).
+   Машины бүх бүртгэлийн боломжит ангиллуудыг огтлолцуулж, яг нэг үлдвэл түүнийг сонгоно (зөрчилдвөл таахгүй). */
+var CAR_STOP={'бүх':1,'төрлийн':1,'овор':1,'том':1,'дунд':1,'бага':1,'тэрэг':1,'амбаартай':1};
+function carTokens(c){
+  var t=[c.name.toLowerCase()];
+  (c.name+','+(c.sub||'')).toLowerCase().split(/[,\s]+/).forEach(function(w){ w=w.trim(); if(w.length>=3&&!CAR_STOP[w]&&t.indexOf(w)<0) t.push(w); });
+  return t;
 }
+function recCands(r){
+  var fw=function(t){ return String(t||'').toLowerCase().split(/[\s·]+/)[0]; };
+  var lab=String(r.service||'').toLowerCase();
+  var base=(r.free||r.own)?(+r.list||0):((r.extras&&r.extras.length)?(+r.base||0):(+r.price||0));
+  var ks=db.cols.filter(function(k){return k.k!=='x'&&(r.group===k.name||fw(lab)===fw(k.name));});
+  if(ks.length&&base>0){
+    var byPrice=db.cars.filter(function(c){return ks.some(function(k){return mPrice(c.id,k.id)===base;});}).map(function(c){return c.id;});
+    if(byPrice.length) return byPrice;
+  }
+  var byName=db.cars.filter(function(c){return carTokens(c).some(function(t){return lab.indexOf(t)>=0;});}).map(function(c){return c.id;});
+  return byName.length?byName:null;
+}
+/* {id, sure}: sure=true бол ангилал бүртгэлд сонгогдсон, false бол таамаг */
+function carGuess(pk){
+  var lc=lastCar(pk); if(lc) return {id:lc,sure:true};
+  if(!db.cars.length) return null;
+  var set=null;
+  db.records.forEach(function(r){
+    if(r.del||plateKey(r.plate)!==pk) return;
+    var c=recCands(r); if(!c) return;
+    set=set?set.filter(function(x){return c.indexOf(x)>=0;}):c.slice();
+  });
+  if(set&&set.length===1) return {id:set[0],sure:false};
+  /* Ажилтны утас: гол утасны таасан ангилал */
+  var best=null, bt='';
+  db.ext.forEach(function(e){ if(!e||e.p!==pk||!e.cg) return; var t=(e.d||'')+' '+(e.t||''); if(t>bt){bt=t;best=e.cg;} });
+  return carById(best)?{id:best,sure:false}:null;
+}
+function guessCar(pk){ var g=carGuess(pk); return g?g.id:null; }
 function lastCar(pk){
   var best=null, bt='';
   db.records.forEach(function(r){ if(r.del||!r.carId||plateKey(r.plate)!==pk) return; var t=(r.date||'')+' '+(r.time||''); if(t>bt){bt=t;best=r.carId;} });
@@ -945,7 +963,7 @@ function drawCars(){
   var c=carById(sel.car);
   $('carChips').innerHTML='<div class="wdd wk"><button type="button" class="wbtn'+(c?' on':'')+'" id="carBtn" aria-haspopup="listbox" aria-expanded="'+carOpen+'">'+
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 16v-4l2.2-5h13.6L21 12v4"/><path d="M3 12h18M3 16h18"/><circle cx="7" cy="17.5" r="1.6"/><circle cx="17" cy="17.5" r="1.6"/></svg>'+
-    '<span class="nm'+(c?'':' ph')+'">'+(c?esc(c.name)+(sel.carAuto?'<small style="display:block;font-size:12px;font-weight:400;color:var(--muted)">өмнөх удаагийнхаар</small>':''):'Машины ангилал сонгох')+'</span><span class="car">▼</span></button>'+
+    '<span class="nm'+(c?'':' ph')+'">'+(c?esc(c.name)+(sel.carAuto?'<small style="display:block;font-size:12px;font-weight:400;color:'+(sel.carAuto==='guess'?'#b26b00':'var(--muted)')+'">'+(sel.carAuto==='guess'?'өмнөх үнээр таасан — шалгана уу':'өмнөх удаагийнхаар')+'</small>':''):'Машины ангилал сонгох')+'</span><span class="car">▼</span></button>'+
     (carOpen?'<div class="wmenu" role="listbox" aria-label="Машины ангилал">'+db.cars.map(function(x){
       var on=sel.car===x.id;
       return '<button type="button" role="option" aria-selected="'+on+'" class="'+(on?'on':'')+'" data-car="'+esc(x.id)+'"><span class="ck">✓</span><b>'+esc(x.name)+'</b>'+(x.sub?'<small>'+esc(x.sub)+'</small>':'')+'</button>';
@@ -1200,8 +1218,8 @@ $('splitBox').addEventListener('click',function(e){
 });
 function autoCar(k){
   if(editId||!db.cars.length||sel.carManual) return;
-  var lc=k.length>=4?guessCar(k):null;
-  if(lc){ if(lc!==sel.car){ setCar(lc,false); } sel.carAuto=true; drawCars(); }
+  var g=k.length>=4?carGuess(k):null, lc=g?g.id:null;
+  if(lc){ if(lc!==sel.car){ setCar(lc,false); } sel.carAuto=g.sure?'last':'guess'; drawCars(); }
   else if(sel.carAuto){ sel.carAuto=false; setCar(null,false); }
 }
 function drawPlateInfo(){
@@ -1905,8 +1923,10 @@ function custSummary(){
   db.records.forEach(function(r){ if(r.date>=cut) by[plateKey(r.plate)]=1; });
   db.ext.forEach(function(e){ if(e&&e.d>=cut) by[e.p]=1; });
   Object.keys(by).forEach(function(pk){
+    var gc=db.role==='main'?carGuess(pk):null;
     visits(pk).forEach(function(x){
       var o={i:x.id,p:pk,d:x.date,t:x.time,v:x.v}; if(x.car) o.c=x.car;
+      if(!x.car&&gc&&!gc.sure) o.cg=gc.id;
       if(x.free){ o.f=1; o.u=x.u; }
       out.push(o);
     });
@@ -2494,7 +2514,7 @@ resetForm(); exReset(); refreshAll(); applyRole(); checkJoinHash();
 </script>
 <script>
 (function(){
-  var APP_VER='2026-11-22g';
+  var APP_VER='2026-11-22h';
   var vd=document.createElement('div'); vd.className='hint'; vd.style.cssText='text-align:center;margin:4px 0 12px';
   vd.textContent='Аппын хувилбар: '+APP_VER;
   document.getElementById('p-set').appendChild(vd);
