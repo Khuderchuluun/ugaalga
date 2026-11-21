@@ -138,11 +138,10 @@ h2{font-size:18px;margin:0 0 12px}
       var solo=by[g].length===1&&by[g][0].n===g;
       return (g&&!solo?'<div class="g">'+esc(g)+'</div>':'')+by[g].sort(function(a,b){return a.c-b.c;}).map(function(x){
         var ok=bal>=x.c, pct=Math.min(100,Math.round(bal/x.c*100));
-        var priced=x.pr>0, off=data.on===0;
-        return '<div class="it'+(ok&&!off?' ok':'')+'"><div class="r"><span class="nm">'+esc(x.n)+'</span>'+
-          (priced?'<span class="pr">'+num(x.pr)+'₮</span>':'<span class="c">'+num(x.c)+' оноо</span>')+'</div>'+
+        var off=data.on===0;
+        return '<div class="it'+(ok&&!off?' ok':'')+'"><div class="r"><span class="nm">'+esc(x.n)+'</span><span class="pr">'+num(x.c)+' оноо</span></div>'+
           (off?'':'<div class="bar"><i style="width:'+pct+'%"></i></div>'+
-          '<div class="st">'+(ok?'✓ Үнэгүй авах боломжтой'+(priced?' ('+num(x.c)+' оноо)':''):(priced?num(x.c)+' оноогоор үнэгүй · '+num(x.c-bal)+' дутуу':num(x.c-bal)+' оноо дутуу'))+'</div>')+'</div>';
+          '<div class="st">'+(ok?'✓ Үнэгүй авах боломжтой':num(x.c-bal)+' оноо дутуу')+'</div>')+'</div>';
       }).join('');
     }).join('');
   }
@@ -150,17 +149,17 @@ h2{font-size:18px;margin:0 0 12px}
   function table(){
     var cars=data.cars||[], cols=[], seen={};
     (data.svc||[]).forEach(function(x){ if(typeof x.k==='number'&&!(x.g in seen)){ seen[x.g]=1; cols.push(x.g); } });
-    var price=function(ci,g){ var it=(data.svc||[]).filter(function(x){return x.k===ci&&x.g===g;})[0]; return it&&it.pr>0?num(it.pr/1000)+'к':'—'; };
+    var pts=function(ci,g){ var it=(data.svc||[]).filter(function(x){return x.k===ci&&x.g===g;})[0]; return it&&it.c>0?num(it.c):'—'; };
     return '<div style="overflow-x:auto"><table class="mt"><thead><tr><th>Ангилал</th>'+cols.map(function(g){return '<th>'+esc(g)+'</th>';}).join('')+'</tr></thead><tbody>'+
-      cars.map(function(n,ci){ return '<tr><td>'+esc(n)+'</td>'+cols.map(function(g){return '<td>'+price(ci,g)+'</td>';}).join('')+'</tr>'; }).join('')+
-      '</tbody></table></div><div class="hint">Үнэ мянган төгрөгөөр (40к = 40,000₮). Үнэгүй угаалгад тухайн үнийн '+(+data.paid||10)+' дахин их оноо хэрэгтэй. Дараагийн удаа угаалгуулахад таны машины үнэ энд шууд харагдана.</div>';
+      cars.map(function(n,ci){ return '<tr><td>'+esc(n)+'</td>'+cols.map(function(g){return '<td>'+pts(ci,g)+'</td>';}).join('')+'</tr>'; }).join('')+
+      '</tbody></table></div><div class="hint">Тухайн угаалгыг үнэгүй авахад хэрэгтэй оноо. Дараагийн удаа угаалгуулахад таны машины мэдээлэл энд шууд харагдана.</div>';
   }
   function render(scroll){
     var off=data.on===0, cars=data.cars||[], known=cur.car>=0||!cars.length;
     var html='<div class="card bal"><div class="n">'+num(cur.bal)+'</div><div class="u">оноо</div><div class="pl">'+esc(cur.raw)+'</div></div>'+
       (off?'<div class="card msg">Урамшуулал одоогоор түр зогссон байна.</div>':'')+
-      (known?'<div class="card"><h2>Таны машины үнэ'+(cars[cur.car]?' · '+esc(cars[cur.car]):'')+'</h2>'+list(cur.bal,cur.car)+'</div>':
-        '<div class="card"><h2>Угаалгын үнэ</h2>'+table()+'</div>');
+      (known?'<div class="card"><h2>Үнэгүй угаалгад хэрэгтэй оноо'+(cars[cur.car]?' · '+esc(cars[cur.car]):'')+'</h2>'+list(cur.bal,cur.car)+'</div>':
+        '<div class="card"><h2>Үнэгүй угаалгад хэрэгтэй оноо</h2>'+table()+'</div>');
     if(scroll) show(html); else $('res').innerHTML=html;
   }
   $('f').addEventListener('submit',function(e){
