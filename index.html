@@ -214,6 +214,12 @@ h2{font-size:15px;margin:0 0 var(--s2)}
 .sgrp .sghead input{font-weight:700}
 .sgrp .sitem{padding-left:var(--s3)}
 .btn.sm{font-size:14px;min-height:40px;padding:var(--s2);margin-top:0}
+.pmgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s2);margin-top:var(--s2)}
+.pmc{display:block;margin:0}
+.pmc span{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pmc input{width:100%;min-height:40px;padding:var(--s2)}
+.pmc.pmx span{font-style:italic}
+.wmenu button small{grid-column:2;grid-row:2;font-size:12px;color:var(--muted);line-height:1.3;white-space:normal}
 .setrow{display:flex;gap:var(--s2);align-items:center;margin-bottom:var(--s2)}
 .setrow input{min-height:40px;padding:var(--s2)}
 .setrow .pr{max-width:110px}
@@ -314,6 +320,7 @@ body.worker .rec{cursor:default}
     <div class="promo" id="promo"></div>
     <div class="ownbox"><label class="chk"><input type="checkbox" id="ownOn"> Өөрийн машин (орлогогүй, ажилтны цалин бодно)</label></div>
 
+    <div id="carWrap" hidden><label>Машины ангилал</label><div id="carChips"></div></div>
     <label>Угаалгын төрөл</label>
     <div id="svcChips"></div>
     <div class="xtra">
@@ -514,6 +521,15 @@ body.worker .rec{cursor:default}
     </details>
   </div>
   <div class="card adm acc-card">
+    <details class="acc" id="accPm">
+      <summary><span class="at">Машины ангилал ба үнэ</span><span class="as" id="accPmSum"></span><span class="car" aria-hidden="true">▼</span></summary>
+      <div class="acc-body">
+    <div class="hint" style="margin:0 0 8px">Машины ангилал бүрт угаалга, нэмэлтийн үнийг оруулна. Хоосон үлдээсэн нүд тухайн машинд харагдахгүй. Бүртгэхдээ эхлээд машины ангиллаа сонгоход үнэ автоматаар гарна.</div>
+    <div id="pmSet"></div>
+      </div>
+    </details>
+  </div>
+  <div class="card adm acc-card">
     <details class="acc" id="accSvc">
       <summary><span class="at">Угаалгын төрөл ба үнэ</span><span class="as" id="accSvcSum"></span><span class="car" aria-hidden="true">▼</span></summary>
       <div class="acc-body">
@@ -663,6 +679,7 @@ function defaults(){
     expCats:[
       {id:'e1',name:'Ус',track:true,unit:'тн',qty:3},{id:'e2',name:'Түлээ, нүүрс',track:false,unit:'',qty:0},{id:'e3',name:'Угаалгын хөөс',track:true,unit:'ш',qty:0},
       {id:'e4',name:'Өнгөлөгч',track:true,unit:'л',qty:0},{id:'e5',name:'Багаж хэрэгсэл',track:false,unit:'',qty:0},{id:'e6',name:'Бусад',track:false,unit:'',qty:0}],
+    cars:[], cols:[], pm:{},
     extras:[{id:'x1',name:'Тааз',price:10000,g:''},{id:'x2',name:'Мотор бодисоор угаах',price:15000,g:''}]
   };
 }
@@ -704,6 +721,9 @@ function normalize(d){
     if(!(c.qty>=0)) c.qty=0;
   });
   d.extras.forEach(function(x){ if(x&&typeof x.g!=='string') x.g=''; });
+  if(!Array.isArray(d.cars)) d.cars=[];
+  if(!Array.isArray(d.cols)) d.cols=[];
+  if(!d.pm||typeof d.pm!=='object'||Array.isArray(d.pm)) d.pm={};
   return d;
 }
 function save(){
@@ -755,6 +775,55 @@ function svcById(id){return db.services.filter(function(x){return x.id===id;})[0
 function svcByLabel(l){return db.services.filter(function(x){return svcLabel(x)===l;})[0]||db.services.filter(function(x){return x.name===l;})[0]||null;}
 function svcPrice(label){var s=(sel&&sel.svcId&&svcById(sel.svcId))||svcByLabel(label);return s?s.price:0;}
 function svcGroups(){var o=[],m={};db.services.forEach(function(x){var g=x.g||'';if(g&&!m[g]){m[g]=1;o.push(g);}});return o;}
+/* ---------- машины ангилал × үнийн хүснэгт ----------
+   Эх сурвалж: db.cars [{id,name,sub}], db.cols [{id,name,k:'w'(угаалга)|'x'(нэмэлт)}], db.pm {carId:{colId:үнэ}}.
+   syncMatrix() үүнээс db.services / db.extras-д "m:машин:багана" id-тай мөрүүд үүсгэнэ (бусад код тэдгээрийг энгийн төрөл шиг ашиглана). */
+function isM(x){ return !!(x&&typeof x.id==='string'&&x.id.indexOf('m:')===0); }
+function carById(id){ return id?db.cars.filter(function(c){return c.id===id;})[0]||null:null; }
+function mPrice(cid,kid){ var r=db.pm[cid]; return r?(+r[kid]||0):0; }
+function syncMatrix(d){
+  d=d||db;
+  var ms=[], mx=[];
+  (d.cols||[]).forEach(function(k){
+    (d.cars||[]).forEach(function(c){
+      var v=d.pm[c.id]?(+d.pm[c.id][k.id]||0):0; if(!(v>0)) return;
+      var it={id:'m:'+c.id+':'+k.id,name:c.name,price:v,g:k.name,c:c.id};
+      (k.k==='x'?mx:ms).push(it);
+    });
+  });
+  d.services=ms.concat((d.services||[]).filter(function(x){return !isM(x);}));
+  d.extras=mx.concat((d.extras||[]).filter(function(x){return !isM(x);}));
+}
+function svcGroupsL(){var o=[],m={};db.services.forEach(function(x){var g=x.g||'';if(g&&!isM(x)&&!m[g]){m[g]=1;o.push(g);}});return o;}
+function xGroupsL(){ var o=[],m={}; db.extras.forEach(function(x){ if(x.g&&!isM(x)&&!m[x.g]){m[x.g]=1;o.push(x.g);} }); return o; }
+/* Таны үнийн жагсаалт (300×200 см) */
+var PM_PRESET={
+  cols:[['k1','Бүтэн','w'],['k2','Гадар','w'],['k3','Дотор','w'],['k4','Өөрөө угаах','w'],
+        ['k5','Тааз','x'],['k6','Мотор бодисоор','x'],['k7','Мотор шүрших','x'],['k8','Шалавч','x'],['k9','Шаврын нэмэгдэл','x']],
+  cars:[['c1','Alphard','',[70000,40000,40000,30000,48000,28000,20000,8000,10000]],
+        ['c2','Бүх төрлийн жийп','',[70000,40000,40000,30000,40000,28000,20000,10000,10000]],
+        ['c3','Том овор','Микроавтобус, амбаартай портер',[60000,35000,35000,25000,40000,25000,15000,10000,10000]],
+        ['c4','Дунд овор','Harrier, RX, Outlander, Subaru, Sienna, RAV4, X-Trail, Портер',[55000,35000,35000,25000,35000,23000,15000,8000,10000]],
+        ['c5','Бага овор','Prius 40, Prius 41, C-HR, Probox',[50000,30000,30000,20000,30000,20000,10000,8000,10000]],
+        ['c6','Суудлын тэрэг','',[45000,25000,25000,20000,28000,15000,8000,8000,10000]],
+        ['c7','Aqua','',[40000,25000,25000,20000,25000,15000,8000,8000,10000]]],
+  other:[['Том эд зүйл',25000],['Жижиг эд зүйл',10000]]
+};
+function applyPreset(){
+  db.cols=PM_PRESET.cols.map(function(k){return {id:k[0],name:k[1],k:k[2]};});
+  db.cars=PM_PRESET.cars.map(function(c){return {id:c[0],name:c[1],sub:c[2]};});
+  db.pm={}; PM_PRESET.cars.forEach(function(c){ var r={}; db.cols.forEach(function(k,i){ if(c[3][i]>0) r[k.id]=c[3][i]; }); db.pm[c[0]]=r; });
+  /* Хуучин угаалгын төрөл, нэмэлтийг хасаж (өмнөх бүртгэл хэвээр), "Бусад" нэмэлтийг оруулна */
+  db.services=[];
+  db.extras=PM_PRESET.other.map(function(o,i){return {id:'xo'+(i+1),name:o[0],price:o[1],g:''};});
+  syncMatrix();
+}
+function lastCar(pk){
+  var best=null, bt='';
+  db.records.forEach(function(r){ if(r.del||!r.carId||plateKey(r.plate)!==pk) return; var t=(r.date||'')+' '+(r.time||''); if(t>bt){bt=t;best=r.carId;} });
+  db.ext.forEach(function(e){ if(!e||e.p!==pk||!e.c) return; var t=(e.d||'')+' '+(e.t||''); if(t>bt){bt=t;best=e.c;} });
+  return carById(best)?best:null;
+}
 
 /* ---------- цалин ---------- */
 function pctOf(w){var p=db.pct[w];return (typeof p==='number'&&p>=0)?p:DEF_PCT;}
@@ -771,11 +840,11 @@ function visits(pk){
   db.records.forEach(function(r){
     if(plateKey(r.plate)!==pk) return; seen[r.id]=1;
     if(r.del||db.dupIds[r.id]||r.own) return;
-    out.push({id:r.id,date:r.date,time:r.time,free:!!r.free,service:r.service,v:+r.price||0,u:spentPts(r)});
+    out.push({id:r.id,date:r.date,time:r.time,free:!!r.free,service:r.service,v:+r.price||0,u:spentPts(r),car:r.carId||''});
   });
   db.ext.forEach(function(e){
     if(!e||e.p!==pk||seen[e.i]||db.dupIds[e.i]) return; seen[e.i]=1;
-    out.push({id:e.i,date:e.d,time:e.t,free:!!e.f,service:e.s||'',v:+e.v||0,u:+e.u||0});
+    out.push({id:e.i,date:e.d,time:e.t,free:!!e.f,service:e.s||'',v:+e.v||0,u:+e.u||0,car:e.c||''});
   });
   return out.sort(function(a,b){return (a.date+a.time).localeCompare(b.date+b.time);});
 }
@@ -819,7 +888,8 @@ function loyalty(pk,exceptId){
 }
 
 /* ---------- add / edit form ---------- */
-var sel={svc:null,svcId:null,wrk:null,co:[],pay:PAYS[0],free:false,own:false,xOn:false,xs:[],xOld:null,base:0}, editId=null, openGrp=null, wrkOpen=false, svcOpen=false, wrkAdd=false;
+var carOpen=false;
+var sel={car:null,carManual:false,carAuto:false,svc:null,svcId:null,wrk:null,co:[],pay:PAYS[0],free:false,own:false,xOn:false,xs:[],xOld:null,base:0}, editId=null, openGrp=null, wrkOpen=false, svcOpen=false, wrkAdd=false;
 
 /* Бүртгэлийн төлбөрийг хэлбэр бүрээр задлана: {Бэлэн:x, Карт:y, Шилжүүлэг:z} */
 function payParts(r){
@@ -847,14 +917,48 @@ function drawSplit(){
   else { el.className='sl bad'; el.textContent=money(-left)+' илүү байна (үнэ '+money(price)+')'; }
 }
 function clearSplit(){ PAYS.forEach(function(p,i){ $('spl'+i).value=''; }); }
+function drawCars(){
+  var w=$('carWrap');
+  if(!db.cars.length){ w.hidden=true; carOpen=false; if(sel.car) sel.car=null; return; }
+  w.hidden=false;
+  if(sel.car&&!carById(sel.car)) sel.car=null;
+  var c=carById(sel.car);
+  $('carChips').innerHTML='<div class="wdd wk"><button type="button" class="wbtn'+(c?' on':'')+'" id="carBtn" aria-haspopup="listbox" aria-expanded="'+carOpen+'">'+
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 16v-4l2.2-5h13.6L21 12v4"/><path d="M3 12h18M3 16h18"/><circle cx="7" cy="17.5" r="1.6"/><circle cx="17" cy="17.5" r="1.6"/></svg>'+
+    '<span class="nm'+(c?'':' ph')+'">'+(c?esc(c.name)+(sel.carAuto?'<small style="display:block;font-size:12px;font-weight:400;color:var(--muted)">өмнөх удаагийнхаар</small>':''):'Машины ангилал сонгох')+'</span><span class="car">▼</span></button>'+
+    (carOpen?'<div class="wmenu" role="listbox" aria-label="Машины ангилал">'+db.cars.map(function(x){
+      var on=sel.car===x.id;
+      return '<button type="button" role="option" aria-selected="'+on+'" class="'+(on?'on':'')+'" data-car="'+esc(x.id)+'"><span class="ck">✓</span><b>'+esc(x.name)+'</b>'+(x.sub?'<small>'+esc(x.sub)+'</small>':'')+'</button>';
+    }).join('')+'</div>':'')+'</div>';
+}
+/* Машины ангилал солиход сонгосон угаалга, нэмэлтийг шинэ ангиллын ижил багана руу шилжүүлнэ */
+function setCar(id,manual){
+  sel.car=id&&carById(id)?id:null;
+  if(manual){ sel.carManual=true; sel.carAuto=false; }
+  var mv=function(xid,list){ if(!/^m:/.test(xid)) return xid; if(!sel.car) return null; var k=xid.split(':')[2], n='m:'+sel.car+':'+k;
+    return list.some(function(y){return y.id===n;})?n:null; };
+  if(sel.svcId){ var ns=mv(sel.svcId,db.services); if(ns!==sel.svcId){ sel.svcId=ns; var s=ns?svcById(ns):null; sel.svc=s?svcLabel(s):null; } }
+  sel.xs=sel.xs.map(function(x){return mv(x,db.extras);}).filter(Boolean);
+  sel.xOld=null;
+  carOpen=false; drawChips(); drawExtras(); recalcPrice();
+}
+$('carChips').addEventListener('click',function(e){
+  if(e.stopPropagation) e.stopPropagation();
+  var b=e.target.closest('[data-car]');
+  if(b){ setCar(b.getAttribute('data-car'),true); if(plateKey($('plate').value).length>=4) drawPlateInfo(); return; }
+  if(e.target.closest('#carBtn')){ carOpen=!carOpen; wrkOpen=false; openGrp=null; if(openXGrp){ openXGrp=null; drawExtras(); } drawChips(); }
+});
 function drawChips(){
+  drawCars();
+  var hasM=db.cars.length&&db.services.some(isM), noCar=hasM&&!sel.car;
+  var vis=db.services.filter(function(x){return !isM(x)||x.c===sel.car;});
   var cur=sel.svcId?svcById(sel.svcId):null, seenG={}, top=[];
-  db.services.forEach(function(x){
+  vis.forEach(function(x){
     if(x.g){ if(!seenG[x.g]){ seenG[x.g]=1; top.push({g:x.g}); } }
     else top.push({s:x});
   });
   if(openGrp&&!seenG[openGrp]) openGrp=null;
-  if(!db.services.length){ openGrp=null; $('svcChips').innerHTML='<div class="hint">Тохиргооноос төрөл нэмнэ үү.</div>'; }
+  if(!vis.length){ openGrp=null; $('svcChips').innerHTML='<div class="hint">'+(noCar?'Эхлээд машины ангиллаа сонгоно уу.':'Тохиргооноос төрөл нэмнэ үү.')+'</div>'; }
   else{
     var gi=svcGroups();
     var cells=top.map(function(t,ci){
@@ -863,7 +967,7 @@ function drawChips(){
         var on=sel.svcId===t.s.id;
         return '<button type="button" class="wbtn'+(on?' on':'')+'" data-svc="'+esc(t.s.id)+'" aria-pressed="'+on+'"><span class="nm">'+esc(t.s.name)+'<small>'+money(t.s.price)+'</small></span></button>';
       }
-      var items=db.services.filter(function(x){return x.g===t.g;}), ps=items.map(function(x){return +x.price||0;});
+      var items=vis.filter(function(x){return x.g===t.g;}), ps=items.map(function(x){return +x.price||0;});
       var lo=Math.min.apply(null,ps), hi=Math.max.apply(null,ps), picked=cur&&cur.g===t.g, op=openGrp===t.g;
       if(items.length===1){
         var x1=items[0], on1=sel.svcId===x1.id;
@@ -877,7 +981,7 @@ function drawChips(){
           return '<button type="button" role="option" aria-selected="'+on+'" class="'+(on?'on':'')+'" data-svc="'+esc(x.id)+'"><span class="ck">✓</span><b>'+esc(x.name)+'</b><span class="pr">'+money(x.price)+'</span></button>';
         }).join('')+'</div>':'')+'</div>';
     });
-    $('svcChips').innerHTML='<div class="sgrid">'+cells.join('')+'</div>';
+    $('svcChips').innerHTML=(noCar?'<div class="hint" style="margin:0 0 8px">Машины ангиллаа сонгоход бусад угаалга гарна.</div>':'')+'<div class="sgrid">'+cells.join('')+'</div>';
   }
   if(!db.workers.length){ wrkOpen=false; $('wrkChips').innerHTML='<div class="hint">Тохиргооноос ажилтан нэмнэ үү.</div>'; }
   else{
@@ -916,6 +1020,7 @@ function resetForm(){
   editId=null; var now=new Date();
   $('plate').value=''; $('price').value=''; $('note').value='';
   $('date').value=dstr(now); $('time').value=tstr(now);
+  sel.car=null; sel.carManual=false; sel.carAuto=false; carOpen=false;
   sel.svc=null; sel.svcId=null; openGrp=null; wrkOpen=false; svcOpen=false; sel.pay=PAYS[0]; sel.free=false; clearSplit();
   sel.xOn=false; sel.xs=[]; sel.xOld=null; sel.base=0; $('priceHint').hidden=true; drawExtras();
   sel.own=false; drawOwn();
@@ -935,7 +1040,7 @@ $('svcChips').addEventListener('click',function(e){
   var g=e.target.closest('[data-gbtn]');
   if(g){
     var gname=svcGroups()[+g.getAttribute('data-gbtn')];
-    openGrp=(openGrp===gname?null:gname); wrkOpen=false; if(openXGrp){ openXGrp=null; drawExtras(); } drawChips();
+    openGrp=(openGrp===gname?null:gname); wrkOpen=false; carOpen=false; if(openXGrp){ openXGrp=null; drawExtras(); } drawChips();
   }
 });
 function pickSvc(s){
@@ -949,7 +1054,7 @@ function pickSvc(s){
 }
 /* ---------- нэмэлт үйлчилгээ ---------- */
 function xSum(list){ return (list||[]).reduce(function(a,x){return a+(+x.p||0);},0); }
-function xSel(){ return db.extras.filter(function(x){return sel.xs.indexOf(x.id)>=0;}).map(function(x){return {id:x.id,n:svcLabel(x),p:+x.price||0,g:x.g||''};}); }
+function xSel(){ return db.extras.filter(function(x){return sel.xs.indexOf(x.id)>=0;}).map(function(x){return {id:x.id,n:isM(x)?x.g:svcLabel(x),p:+x.price||0,g:x.g||''};}); }
 function xById(id){ return db.extras.filter(function(x){return x.id===id;})[0]||null; }
 function xGroups(){ var o=[],m={}; db.extras.forEach(function(x){ if(x.g&&!m[x.g]){m[x.g]=1;o.push(x.g);} }); return o; }
 var openXGrp=null;
@@ -978,16 +1083,18 @@ function recalcPrice(){
 function drawExtras(){
   $('xOn').checked=sel.xOn;
   var box=$('xList'); box.hidden=!sel.xOn; if(!sel.xOn){ box.innerHTML=''; openXGrp=null; return; }
-  if(!db.extras.length){ box.innerHTML='<div class="hint">Тохиргооноос нэмэлт үйлчилгээ нэмнэ үү.</div>'; return; }
+  var noCarX=db.cars.length&&!sel.car&&db.extras.some(isM);
+  var vx=db.extras.filter(function(x){return !isM(x)||x.c===sel.car;});
+  if(!vx.length){ box.innerHTML='<div class="hint">'+(noCarX?'Машины ангиллаа сонгоход нэмэлт үйлчилгээ гарна.':'Тохиргооноос нэмэлт үйлчилгээ нэмнэ үү.')+'</div>'; return; }
   var seen={}, top=[], gi=xGroups();
-  db.extras.forEach(function(x){ if(x.g){ if(!seen[x.g]){ seen[x.g]=1; top.push({g:x.g}); } } else top.push({x:x}); });
+  vx.forEach(function(x){ if(x.g){ if(!seen[x.g]){ seen[x.g]=1; top.push({g:x.g}); } } else top.push({x:x}); });
   if(openXGrp&&!seen[openXGrp]) openXGrp=null;
   var cells=top.map(function(t,ci){
     var side=ci%2?' r':'';
     var tog=function(x,title){ var on=sel.xs.indexOf(x.id)>=0;
       return '<button type="button" class="wbtn'+(on?' on':'')+'" data-xsvc="'+esc(x.id)+'" aria-pressed="'+on+'"><span class="nm">'+esc(title)+'<small>+'+money(x.price)+'</small></span>'+(on?'<span class="car">✓</span>':'')+'</button>'; };
     if(t.x) return tog(t.x,t.x.name);
-    var items=db.extras.filter(function(x){return x.g===t.g;});
+    var items=vx.filter(function(x){return x.g===t.g;});
     if(items.length===1) return tog(items[0],t.g);
     var ps=items.map(function(x){return +x.price||0;}), lo=Math.min.apply(null,ps), hi=Math.max.apply(null,ps);
     var cur=items.filter(function(x){return sel.xs.indexOf(x.id)>=0;})[0], op=openXGrp===t.g;
@@ -1000,7 +1107,7 @@ function drawExtras(){
           return '<button type="button" role="option" aria-selected="'+on+'" class="'+(on?'on':'')+'" data-xsvc="'+esc(x.id)+'"><span class="ck">✓</span><b>'+esc(x.name)+'</b><span class="pr">+'+money(x.price)+'</span></button>';
         }).join('')+'</div>':'')+'</div>';
   });
-  box.innerHTML='<div class="sgrid">'+cells.join('')+'</div>';
+  box.innerHTML=(noCarX?'<div class="hint" style="margin:0 0 8px">Машины ангиллаа сонгоход бусад нэмэлт гарна.</div>':'')+'<div class="sgrid">'+cells.join('')+'</div>';
 }
 $('xOn').addEventListener('change',function(){
   sel.xOn=this.checked; if(!sel.xOn){ sel.xs=[]; } sel.xOld=null;
@@ -1048,12 +1155,12 @@ $('wrkChips').addEventListener('click',function(e){
 });
 /* Цэсний гадна дарах эсвэл Esc дарахад хаагдана */
 document.addEventListener('click',function(e){
-  if(!wrkOpen&&!openGrp&&!openXGrp) return;
+  if(!wrkOpen&&!openGrp&&!openXGrp&&!carOpen) return;
   var t=e.target;
-  if(t&&t.closest&&(t.closest('#wrkChips')||t.closest('#svcChips')||t.closest('#xList'))) return;
-  wrkOpen=false; openGrp=null; openXGrp=null; drawChips(); drawExtras();
+  if(t&&t.closest&&(t.closest('#wrkChips')||t.closest('#svcChips')||t.closest('#xList')||t.closest('#carChips'))) return;
+  wrkOpen=false; openGrp=null; openXGrp=null; carOpen=false; drawChips(); drawExtras();
 });
-document.addEventListener('keydown',function(e){ if((wrkOpen||openGrp||openXGrp)&&e.key==='Escape'){ wrkOpen=false; openGrp=null; openXGrp=null; drawChips(); drawExtras(); } });
+document.addEventListener('keydown',function(e){ if((wrkOpen||openGrp||openXGrp||carOpen)&&e.key==='Escape'){ wrkOpen=false; openGrp=null; openXGrp=null; carOpen=false; drawChips(); drawExtras(); } });
 $('payChips').addEventListener('click',function(e){
   var b=e.target.closest('[data-pay]'); if(!b) return;
   var np=PAYS.concat([SPLIT])[+b.getAttribute('data-pay')];
@@ -1071,8 +1178,15 @@ $('splitBox').addEventListener('click',function(e){
   var others=v.reduce(function(a,x,j){return j===i?a:a+x;},0);
   $('spl'+i).value=Math.max(0,price-others); drawSplit();
 });
+function autoCar(k){
+  if(editId||!db.cars.length||sel.carManual) return;
+  var lc=k.length>=4?lastCar(k):null;
+  if(lc){ if(lc!==sel.car){ setCar(lc,false); } sel.carAuto=true; drawCars(); }
+  else if(sel.carAuto){ sel.carAuto=false; setCar(null,false); }
+}
 function drawPlateInfo(){
   var k=plateKey($('plate').value), h=$('plateHint');
+  autoCar(k);
   if(k.length<4){h.innerHTML='';notesOpen=false;drawNotes(null);drawPromo(null);return;}
   drawNotes(k);
   var L=loyalty(k,editId);
@@ -1143,6 +1257,8 @@ $('saveBtn').addEventListener('click',function(){
     pay:split?SPLIT:payNow,date:$('date').value||dstr(now),time:$('time').value||tstr(now),note:$('note').value.trim(),
     dev:old?(old.dev||''):db.device,upd:Date.now(),sent:false};
   if(split) rec.split=split;
+  var cc=carById(sel.car); if(cc){ rec.carId=cc.id; rec.car=cc.name; }
+  else if(old&&old.carId&&!db.cars.length){ rec.carId=old.carId; rec.car=old.car; }
   if(sel.wrk&&sel.co.length) rec.workers=[sel.wrk].concat(sel.co);
   var xs=sel.xOld||xSel();
   if(xs.length){ rec.extras=xs; rec.base=Math.max(0,rec.price-xSum(xs)); }
@@ -1184,6 +1300,8 @@ function startEdit(id){
   $('date').value=r.date; $('time').value=r.time;
   sel.svc=r.service; var es=svcByLabel(r.service); sel.svcId=es?es.id:null; openGrp=null; sel.wrk=r.worker||null; sel.co=wList(r).slice(1); sel.pay=r.own?PAYS[0]:(r.pay||PAYS[0]); sel.free=!!r.free; sel.own=!!r.own;
   clearSplit(); if(r.pay===SPLIT&&r.split) PAYS.forEach(function(p,i){ if(r.split[p]) $('spl'+i).value=r.split[p]; });
+  carOpen=false; sel.carAuto=false; sel.carManual=true;
+  sel.car=(r.carId&&carById(r.carId))?r.carId:((db.cars.filter(function(c){return c.name===r.car;})[0]||{}).id||null);
   sel.xs=[]; sel.xOld=null; sel.base=0;
   if(Array.isArray(r.extras)&&r.extras.length){
     sel.xOn=true;
@@ -1355,36 +1473,37 @@ function drawXSet(){
     return '<div class="setrow'+(x.g?' sitem':'')+'"><input data-xn="'+i+'" value="'+esc(x.name)+'" placeholder="Нэр" aria-label="Нэмэлтийн нэр">'+
       '<input class="pr" data-xp="'+i+'" type="number" inputmode="numeric" value="'+esc(x.price)+'" placeholder="Үнэ" aria-label="Үнэ">'+
       '<button class="x" data-xx="'+i+'" aria-label="Устгах">×</button></div>'; };
-  var gs=xGroups(), loose=db.extras.filter(function(x){return !x.g;});
+  var gs=xGroupsL(), loose=db.extras.filter(function(x){return !x.g;});
   $('xSet').innerHTML=gs.map(function(g,gi){
     return '<div class="sgrp"><div class="gl">Бүлэг</div><div class="setrow sghead"><input data-xgn="'+gi+'" value="'+esc(g)+'" placeholder="Бүлгийн нэр" aria-label="Бүлгийн нэр">'+
-      '<button class="x" data-xgx="'+gi+'" aria-label="Бүлгийг устгах">×</button></div>'+db.extras.filter(function(x){return x.g===g;}).map(row).join('')+
+      '<button class="x" data-xgx="'+gi+'" aria-label="Бүлгийг устгах">×</button></div>'+db.extras.filter(function(x){return x.g===g&&!isM(x);}).map(row).join('')+
       '<button class="btn ghost sm" data-xga="'+gi+'">+ '+esc(g)+' бүлэгт нэмэх</button></div>';
   }).join('')+(loose.length?(gs.length?'<div class="gl" style="margin:0 0 8px;font-size:12px;font-weight:700;color:var(--muted)">БҮЛЭГГҮЙ НЭМЭЛТ</div>':'')+loose.map(row).join(''):'')
   ||'<div class="hint" style="margin:0 0 8px">Нэмэлт үйлчилгээ алга.</div>';
   if($('accXSum')) drawAccSums();
 }
 function drawAccSums(){
-  var gs=svcGroups().length, n=db.services.length;
-  $('accSvcSum').textContent=(gs?gs+' бүлэг · ':'')+n+' төрөл';
-  var xg=xGroups().length, xn=db.extras.length;
+  var gs=svcGroupsL().length, n=db.services.filter(function(x){return !isM(x);}).length;
+  $('accSvcSum').textContent=n?(gs?gs+' бүлэг · ':'')+n+' төрөл':'Алга';
+  var xg=xGroupsL().length, xn=db.extras.filter(function(x){return !isM(x);}).length;
+  $('accPmSum').textContent=db.cars.length?db.cars.length+' ангилал · '+db.cols.length+' багана':'Тохируулаагүй';
   $('accXSum').textContent=xn?(xg?xg+' бүлэг · ':'')+xn+' нэмэлт':'Алга';
   $('accWrkSum').textContent=db.workers.length+' ажилтан';
 }
 function drawSettings(){
-  drawXSet(); drawAccSums(); drawExCatSet();
+  drawXSet(); drawAccSums(); drawExCatSet(); drawPm();
   var row=function(s){ var i=db.services.indexOf(s);
     return '<div class="setrow sitem"><input data-sn="'+i+'" value="'+esc(s.name)+'" placeholder="Нэр" aria-label="Төрлийн нэр">'+
       '<input class="pr" data-sp="'+i+'" type="number" inputmode="numeric" value="'+esc(s.price)+'" placeholder="Үнэ" aria-label="Үнэ">'+
       '<button class="x" data-sx="'+i+'" aria-label="Устгах">×</button></div>'; };
-  var gs=svcGroups(), loose=db.services.filter(function(x){return !x.g;});
+  var gs=svcGroupsL(), loose=db.services.filter(function(x){return !x.g;});
   $('svcSet').innerHTML=gs.map(function(g,gi){
-    var items=db.services.filter(function(x){return x.g===g;});
+    var items=db.services.filter(function(x){return x.g===g&&!isM(x);});
     return '<div class="sgrp"><div class="gl">Бүлэг</div><div class="setrow sghead"><input data-gn="'+gi+'" value="'+esc(g)+'" placeholder="Бүлгийн нэр" aria-label="Бүлгийн нэр">'+
       '<button class="x" data-gx="'+gi+'" aria-label="Бүлгийг устгах">×</button></div>'+items.map(row).join('')+
       '<button class="btn ghost sm" data-ga="'+gi+'">+ '+esc(g)+' бүлэгт төрөл нэмэх</button></div>';
   }).join('')+(loose.length?(gs.length?'<div class="gl" style="margin:4px 0 6px;font-size:12px;font-weight:700;color:var(--muted)">БҮЛЭГГҮЙ ТӨРӨЛ</div>':'')+loose.map(row).join(''):'');
-  $('autoGrp').hidden=!(gs.length===0&&db.services.length>1);
+  $('autoGrp').hidden=!(gs.length===0&&db.services.filter(function(x){return !isM(x);}).length>1);
   $('wrkSet').innerHTML=db.workers.map(function(w,i){
     return '<div class="setrow"><input data-wn="'+i+'" value="'+esc(w)+'" placeholder="Нэр">'+
       '<input class="pr" style="max-width:76px" data-wp="'+i+'" type="number" inputmode="numeric" min="0" max="100" value="'+pctOf(w)+'"><span>%</span>'+
@@ -1419,26 +1538,26 @@ $('svcSet').addEventListener('click',function(e){
 });
 $('svcSet').addEventListener('change',function(e){
   var t=e.target; if(!t.hasAttribute('data-gn')) return;
-  var old=svcGroups()[+t.getAttribute('data-gn')], nw=t.value.trim()||'Нэргүй бүлэг';
-  db.services.forEach(function(x){ if(x.g===old) x.g=nw; });
+  var old=svcGroupsL()[+t.getAttribute('data-gn')], nw=t.value.trim()||'Нэргүй бүлэг';
+  db.services.forEach(function(x){ if(x.g===old&&!isM(x)) x.g=nw; });
   if(openGrp===old) openGrp=nw;
   save(); drawSettings(); drawChips();
 });
 $('svcSet').addEventListener('click',function(e){
   var a=e.target.closest('[data-ga]');
   if(a){
-    var g=svcGroups()[+a.getAttribute('data-ga')], last=-1;
-    db.services.forEach(function(x,i){ if(x.g===g) last=i; });
+    var g=svcGroupsL()[+a.getAttribute('data-ga')], last=-1;
+    db.services.forEach(function(x,i){ if(x.g===g&&!isM(x)) last=i; });
     db.services.splice(last+1,0,{id:uid(),name:'Шинэ төрөл',price:0,g:g});
     save(); drawSettings(); drawChips(); return;
   }
   var x=e.target.closest('[data-gx]'); if(!x) return;
-  var gname=svcGroups()[+x.getAttribute('data-gx')], n=db.services.filter(function(s){return s.g===gname;}).length;
+  var gname=svcGroupsL()[+x.getAttribute('data-gx')], n=db.services.filter(function(s){return s.g===gname&&!isM(s);}).length;
   ask('"'+gname+'" бүлэг болон доторх '+n+' төрлийг хасах уу? Өмнөх бүртгэл хэвээр үлдэнэ.','Хасах').then(function(ok){
-    if(!ok) return; db.services=db.services.filter(function(s){return s.g!==gname;}); save(); drawSettings(); drawChips(); });
+    if(!ok) return; db.services=db.services.filter(function(s){return s.g!==gname||isM(s);}); save(); drawSettings(); drawChips(); });
 });
 $('addGrp').addEventListener('click',function(){
-  var gs=svcGroups(), n=gs.length+1, name='Шинэ бүлэг '+n;
+  var gs=svcGroupsL(), n=gs.length+1, name='Шинэ бүлэг '+n;
   while(gs.indexOf(name)>=0){ n++; name='Шинэ бүлэг '+n; }
   db.services.push({id:uid(),name:'Шинэ төрөл',price:0,g:name}); save(); drawSettings(); drawChips();
   try{ var ins=document.querySelectorAll('#svcSet [data-gn]'); ins[ins.length-1].focus(); ins[ins.length-1].select(); }catch(e){}
@@ -1484,8 +1603,8 @@ $('wrkSet').addEventListener('click',function(e){
 $('xSet').addEventListener('change',function(e){
   var t=e.target;
   if(t.hasAttribute('data-xgn')){
-    var old=xGroups()[+t.getAttribute('data-xgn')], nw=t.value.trim()||'Нэргүй бүлэг';
-    db.extras.forEach(function(x){ if(x.g===old) x.g=nw; }); if(openXGrp===old) openXGrp=nw;
+    var old=xGroupsL()[+t.getAttribute('data-xgn')], nw=t.value.trim()||'Нэргүй бүлэг';
+    db.extras.forEach(function(x){ if(x.g===old&&!isM(x)) x.g=nw; }); if(openXGrp===old) openXGrp=nw;
     save(); drawXSet(); drawExtras(); return;
   }
   if(t.hasAttribute('data-xn')) db.extras[+t.getAttribute('data-xn')].name=t.value.trim()||'Нэргүй';
@@ -1495,17 +1614,17 @@ $('xSet').addEventListener('change',function(e){
 $('xSet').addEventListener('click',function(e){
   var ga=e.target.closest('[data-xga]');
   if(ga){
-    var g=xGroups()[+ga.getAttribute('data-xga')], last=-1;
-    db.extras.forEach(function(x,i){ if(x.g===g) last=i; });
+    var g=xGroupsL()[+ga.getAttribute('data-xga')], last=-1;
+    db.extras.forEach(function(x,i){ if(x.g===g&&!isM(x)) last=i; });
     db.extras.splice(last+1,0,{id:uid(),name:'Шинэ төрөл',price:0,g:g}); save(); drawXSet(); drawExtras(); return;
   }
   var gx=e.target.closest('[data-xgx]');
   if(gx){
-    var gname=xGroups()[+gx.getAttribute('data-xgx')], cnt=db.extras.filter(function(x){return x.g===gname;}).length;
+    var gname=xGroupsL()[+gx.getAttribute('data-xgx')], cnt=db.extras.filter(function(x){return x.g===gname&&!isM(x);}).length;
     ask('"'+gname+'" бүлэг болон доторх '+cnt+' нэмэлтийг хасах уу? Өмнөх бүртгэл хэвээр үлдэнэ.','Хасах').then(function(ok){
       if(!ok) return;
-      var ids=db.extras.filter(function(x){return x.g===gname;}).map(function(x){return x.id;});
-      db.extras=db.extras.filter(function(x){return x.g!==gname;});
+      var ids=db.extras.filter(function(x){return x.g===gname&&!isM(x);}).map(function(x){return x.id;});
+      db.extras=db.extras.filter(function(x){return x.g!==gname||isM(x);});
       sel.xs=sel.xs.filter(function(id){return ids.indexOf(id)<0;});
       save(); drawXSet(); drawExtras(); recalcPrice(); });
     return;
@@ -1522,10 +1641,63 @@ $('addX').addEventListener('click',function(){
   try{ var ins=document.querySelectorAll('#xSet [data-xn]'); ins[ins.length-1].focus(); ins[ins.length-1].select(); }catch(x){}
 });
 $('addXGrp').addEventListener('click',function(){
-  var gs=xGroups(), n=gs.length+1, name='Шинэ бүлэг '+n;
+  var gs=xGroupsL(), n=gs.length+1, name='Шинэ бүлэг '+n;
   while(gs.indexOf(name)>=0){ n++; name='Шинэ бүлэг '+n; }
   db.extras.push({id:uid(),name:'Шинэ төрөл',price:0,g:name}); save(); drawXSet(); drawExtras();
   try{ var ins=document.querySelectorAll('#xSet [data-xgn]'); ins[ins.length-1].focus(); ins[ins.length-1].select(); }catch(x){}
+});
+function drawPm(){
+  var box=$('pmSet');
+  if(!db.cars.length){
+    box.innerHTML='<button class="btn" id="pmPreset">Үнийн жагсаалтаар бөглөх (7 ангилал)</button>'+
+      '<div class="hint" style="margin:4px 0 8px">Alphard, жийп, том/дунд/бага овор, суудлын тэрэг, Aqua — Бүтэн, Гадар, Дотор, Өөрөө угаах, нэмэлтүүдийн үнэтэй. Дараа нь засаж болно.</div>'+
+      '<button class="btn ghost" id="pmAddCar">+ Хоосноос эхлэх</button>';
+    return;
+  }
+  var kw=db.cols.filter(function(k){return k.k!=='x';}), kx=db.cols.filter(function(k){return k.k==='x';});
+  var cell=function(c,k){ var v=mPrice(c.id,k.id);
+    return '<label class="pmc'+(k.k==='x'?' pmx':'')+'"><span>'+esc(k.name)+'</span><input type="number" inputmode="numeric" min="0" step="1000" data-pm="'+esc(c.id)+':'+esc(k.id)+'" value="'+(v||'')+'" placeholder="—"></label>'; };
+  box.innerHTML=db.cars.map(function(c,i){
+    return '<div class="sgrp"><div class="setrow sghead"><input data-cn="'+i+'" value="'+esc(c.name)+'" placeholder="Ангиллын нэр" aria-label="Ангиллын нэр">'+
+      '<button class="x" data-cx="'+i+'" aria-label="Ангиллыг устгах">×</button></div>'+
+      '<input data-cs="'+i+'" value="'+esc(c.sub||'')+'" placeholder="Жишээ машинууд (заавал биш)" aria-label="Жишээ машинууд" style="min-height:36px;padding:var(--s2);font-size:14px">'+
+      (kw.length?'<div class="pmgrid">'+kw.map(function(k){return cell(c,k);}).join('')+'</div>':'')+
+      (kx.length?'<div class="gl" style="margin:10px 0 0">Нэмэлт</div><div class="pmgrid" style="margin-top:4px">'+kx.map(function(k){return cell(c,k);}).join('')+'</div>':'')+
+      (i>0?'<button class="btn ghost sm" data-cup="'+i+'" style="margin-top:8px">↑ Дээш зөөх</button>':'')+'</div>';
+  }).join('')+
+  '<button class="btn ghost" id="pmAddCar">+ Машины ангилал нэмэх</button>'+
+  '<div class="sgrp" style="margin-top:var(--s3)"><div class="gl">Баганууд (угаалга ба нэмэлт)</div>'+
+    db.cols.map(function(k,j){ return '<div class="setrow"><input data-kn="'+j+'" value="'+esc(k.name)+'" aria-label="Баганын нэр"><span class="hint" style="margin:0;white-space:nowrap">'+(k.k==='x'?'нэмэлт':'угаалга')+'</span>'+
+      '<button class="x" data-kx="'+j+'" aria-label="Баганыг устгах">×</button></div>'; }).join('')+
+    '<div class="row" style="margin-top:var(--s2)"><button class="btn ghost sm" id="pmAddW">+ Угаалга</button><button class="btn ghost sm" id="pmAddX">+ Нэмэлт</button></div></div>';
+}
+function pmChanged(full){ syncMatrix(); save(); if(full) drawPm(); drawAccSums(); drawChips(); drawExtras(); recalcPrice(); }
+$('pmSet').addEventListener('change',function(e){
+  var t=e.target;
+  if(t.hasAttribute('data-pm')){ var a=t.getAttribute('data-pm').split(':'), v=Math.round(parseFloat(t.value)||0);
+    if(!db.pm[a[0]]) db.pm[a[0]]={}; if(v>0) db.pm[a[0]][a[1]]=v; else delete db.pm[a[0]][a[1]]; pmChanged(false); return; }
+  if(t.hasAttribute('data-cn')){ db.cars[+t.getAttribute('data-cn')].name=t.value.trim()||'Нэргүй'; pmChanged(false); return; }
+  if(t.hasAttribute('data-cs')){ db.cars[+t.getAttribute('data-cs')].sub=t.value.trim(); pmChanged(false); return; }
+  if(t.hasAttribute('data-kn')){ db.cols[+t.getAttribute('data-kn')].name=t.value.trim()||'Нэргүй'; pmChanged(true); return; }
+});
+$('pmSet').addEventListener('click',function(e){
+  var t=e.target.closest('button'); if(!t) return;
+  if(t.id==='pmPreset'){ var had=db.services.some(function(x){return !isM(x);})||db.extras.some(function(x){return !isM(x);});
+    (had?ask('Үнийн жагсаалтаар бөглөхөд одоогийн "Угаалгын төрөл ба үнэ", "Нэмэлт үйлчилгээ" жагсаалт шинээр солигдоно. Өмнөх бүртгэлүүд хэвээр үлдэнэ. Үргэлжлүүлэх үү?','Бөглөх'):Promise.resolve(true))
+    .then(function(ok){ if(!ok) return; applyPreset(); sel.svcId=null; sel.svc=null; sel.xs=[]; save(); drawSettings(); drawChips(); drawExtras(); recalcPrice(); toast('Үнийн хүснэгт бөглөгдлөө'); }); return; }
+  if(t.id==='pmAddCar'){ if(!db.cols.length) db.cols=[{id:uid(),name:'Бүтэн',k:'w'},{id:uid(),name:'Гадар',k:'w'}];
+    db.cars.push({id:uid(),name:'Шинэ ангилал',sub:''}); pmChanged(true);
+    try{ var ins=document.querySelectorAll('#pmSet [data-cn]'); ins[ins.length-1].focus(); ins[ins.length-1].select(); }catch(x){} return; }
+  if(t.id==='pmAddW'||t.id==='pmAddX'){ var kk=t.id==='pmAddX'?'x':'w', nk={id:uid(),name:kk==='x'?'Шинэ нэмэлт':'Шинэ угаалга',k:kk};
+    if(kk==='w'){ var li=-1; db.cols.forEach(function(k,i){ if(k.k!=='x') li=i; }); db.cols.splice(li+1,0,nk); } else db.cols.push(nk);
+    pmChanged(true); try{ var ks=document.querySelectorAll('#pmSet [data-kn]'); var el=[].filter.call(ks,function(x){return db.cols[+x.getAttribute('data-kn')]===nk;})[0]; el.focus(); el.select(); }catch(x){} return; }
+  if(t.hasAttribute('data-cup')){ var i=+t.getAttribute('data-cup'); var c=db.cars.splice(i,1)[0]; db.cars.splice(i-1,0,c); pmChanged(true); return; }
+  if(t.hasAttribute('data-cx')){ var ci=+t.getAttribute('data-cx'), cc=db.cars[ci];
+    ask('"'+cc.name+'" ангиллыг хасах уу? Өмнөх бүртгэл хэвээр үлдэнэ.','Хасах').then(function(ok){ if(!ok) return;
+      db.cars.splice(ci,1); delete db.pm[cc.id]; if(sel.car===cc.id) setCar(null,false); pmChanged(true); }); return; }
+  if(t.hasAttribute('data-kx')){ var kj=+t.getAttribute('data-kx'), kc=db.cols[kj];
+    ask('"'+kc.name+'" баганыг бүх ангиллаас хасах уу? Өмнөх бүртгэл хэвээр үлдэнэ.','Хасах').then(function(ok){ if(!ok) return;
+      db.cols.splice(kj,1); Object.keys(db.pm).forEach(function(c){ delete db.pm[c][kc.id]; }); pmChanged(true); }); return; }
 });
 $('addWrk').addEventListener('click',function(){
   db.workers.push('Ажилтан '+(db.workers.length+1)); save(); drawSettings(); drawChips();
@@ -1642,6 +1814,12 @@ function mergeFile(d,res,had,setOK){
       db.extras=d.extras.filter(function(x){return x&&x.name;}).map(function(x){return {id:String(x.id||uid()),name:String(x.name),price:parseFloat(x.price)||0,g:typeof x.g==='string'?x.g:''};});
       res.set=true;
     }
+    if(Array.isArray(d.cars)&&Array.isArray(d.cols)&&d.pm&&typeof d.pm==='object'){
+      db.cars=d.cars.filter(function(c){return c&&c.id&&c.name;}).map(function(c){return {id:String(c.id),name:String(c.name),sub:typeof c.sub==='string'?c.sub:''};});
+      db.cols=d.cols.filter(function(k){return k&&k.id&&k.name;}).map(function(k){return {id:String(k.id),name:String(k.name),k:k.k==='x'?'x':'w'};});
+      db.pm=JSON.parse(JSON.stringify(d.pm)); res.set=true;
+    }
+    syncMatrix();
     if(typeof d.loyOn==='boolean') db.loyOn=d.loyOn;
     if(d.loyN>=2) db.loyN=Math.round(d.loyN);
     if(d.loyPaid>=1) db.loyPaid=Math.round(d.loyPaid);
@@ -1708,7 +1886,7 @@ function custSummary(){
   db.ext.forEach(function(e){ if(e&&e.d>=cut) by[e.p]=1; });
   Object.keys(by).forEach(function(pk){
     visits(pk).forEach(function(x){
-      var o={i:x.id,p:pk,d:x.date,t:x.time,v:x.v};
+      var o={i:x.id,p:pk,d:x.date,t:x.time,v:x.v}; if(x.car) o.c=x.car;
       if(x.free){ o.f=1; o.u=x.u; }
       out.push(o);
     });
@@ -1729,7 +1907,7 @@ function notesSummary(){
 $('sendSet').addEventListener('click',function(){
   var now=new Date();
   download('ugaalga-tohirgoo-'+dstr(now)+'-'+tstr(now).replace(':','')+'.txt',
-    JSON.stringify({app:KEY,kind:'settings',at:dstr(now)+' '+tstr(now),services:db.services,workers:db.workers,extras:db.extras,
+    JSON.stringify({app:KEY,kind:'settings',at:dstr(now)+' '+tstr(now),services:db.services.filter(function(x){return !isM(x);}),workers:db.workers,extras:db.extras.filter(function(x){return !isM(x);}),cars:db.cars,cols:db.cols,pm:db.pm,
       loyOn:db.loyOn,loyN:db.loyN,loyPaid:db.loyPaid,ptRate:db.ptRate,cust:custSummary(),notes:notesSummary(),dup:Object.keys(db.dupIds)}),'text/plain');
 });
 /* ---------- үйлчлүүлэгчийн онооны хуудас (onoo/) руу нийтлэх ---------- */
@@ -1773,10 +1951,12 @@ function pubData(){
   var salt=Math.random().toString(36).slice(2,10)+Date.now().toString(36), now=new Date(), keys=Object.keys(by), p={};
   return Promise.all(keys.map(function(k){
     var L=loyalty(k); if(!L.total) return null;
-    return sha16(salt+'|'+k).then(function(h){ p[h]=L.bal; });
+    var lc=lastCar(k), ci=lc?db.cars.map(function(c){return c.id;}).indexOf(lc):-1;
+    return sha16(salt+'|'+k).then(function(h){ p[h]=ci>=0?[L.bal,ci]:L.bal; });
   })).then(function(){
     return {v:1,at:dstr(now)+' '+tstr(now),rate:db.ptRate,paid:db.loyPaid,on:db.loyOn?1:0,s:salt,
-      svc:db.services.filter(function(x){return (+x.price||0)>0;}).map(function(x){return {n:x.name,g:x.g||'',c:ptCost(x.price)};}),p:p};
+      cars:db.cars.map(function(c){return c.name;}),
+      svc:db.services.filter(function(x){return (+x.price||0)>0;}).map(function(x){var o={n:x.name,g:x.g||'',c:ptCost(x.price)}; if(isM(x)){ o.k=db.cars.map(function(c){return c.id;}).indexOf(x.c); } return o;}),p:p};
   });
 }
 function b64utf8(s){ var b=new TextEncoder().encode(s), out=''; for(var i=0;i<b.length;i+=0x8000) out+=String.fromCharCode.apply(null,b.subarray(i,i+0x8000)); return btoa(out); }
@@ -2124,7 +2304,7 @@ function suNameOk(){
   if(!n){toast('Утасны нэрийг бичнэ үү');$('suName').focus();return false;}
   db.device=n; return true;
 }
-function roleDone(msg){ save(); if(editId) resetForm(); applyRole(); refreshAll(); show('add'); toast(msg); }
+function roleDone(msg){ save(); if(editId) resetForm(); applyRole(); refreshAll(); drawChips(); drawExtras(); show('add'); toast(msg); }
 $('suMain').addEventListener('click',function(){ if(!suNameOk()) return; db.role='main'; roleDone('Гол утас боллоо'); });
 $('suWorker').addEventListener('click',function(){ if(!suNameOk()) return; showSetup('pin','set'); });
 $('suPinOk').addEventListener('click',function(){
@@ -2168,8 +2348,10 @@ function knownDevices(){
 }
 function inviteUrl(){
   var inv={v:1,m:db.device,p:db.pin,
-    s:db.services.map(function(x){return x.g?[x.id,x.name,x.price,x.g]:[x.id,x.name,x.price];}),
-    w:db.workers,x:db.extras.map(function(x){return x.g?[x.id,x.name,x.price,x.g]:[x.id,x.name,x.price];}),lo:db.loyOn?1:0,ln:db.loyN,lp:db.loyPaid,pr:db.ptRate,u:knownDevices(),at:dstr(new Date())};
+    s:db.services.filter(function(x){return !isM(x);}).map(function(x){return x.g?[x.id,x.name,x.price,x.g]:[x.id,x.name,x.price];}),
+    w:db.workers,x:db.extras.filter(function(x){return !isM(x);}).map(function(x){return x.g?[x.id,x.name,x.price,x.g]:[x.id,x.name,x.price];}),
+    c:db.cars.map(function(c){return c.sub?[c.id,c.name,c.sub]:[c.id,c.name];}),k:db.cols.map(function(k){return [k.id,k.name,k.k==='x'?'x':'w'];}),
+    m:db.cars.map(function(c){return db.cols.map(function(k){return mPrice(c.id,k.id);});}),lo:db.loyOn?1:0,ln:db.loyN,lp:db.loyPaid,pr:db.ptRate,u:knownDevices(),at:dstr(new Date())};
   return location.origin+location.pathname+'#join='+b64e(JSON.stringify(inv));
 }
 function parseInvite(str){
@@ -2187,6 +2369,12 @@ function applyInvite(d){
     return {id:String(x[0]||uid()),name:String(x[1]),price:parseFloat(x[2])||0,g:typeof x[3]==='string'?x[3]:''};});
   db.workers=d.w.filter(function(x){return typeof x==='string'&&x;});
   if(Array.isArray(d.x)) db.extras=d.x.filter(function(x){return Array.isArray(x)&&x[1];}).map(function(x){return {id:String(x[0]||uid()),name:String(x[1]),price:parseFloat(x[2])||0,g:typeof x[3]==='string'?x[3]:''};});
+  if(Array.isArray(d.c)&&Array.isArray(d.k)&&Array.isArray(d.m)){
+    db.cars=d.c.filter(function(x){return Array.isArray(x)&&x[0]&&x[1];}).map(function(x){return {id:String(x[0]),name:String(x[1]),sub:typeof x[2]==='string'?x[2]:''};});
+    db.cols=d.k.filter(function(x){return Array.isArray(x)&&x[0]&&x[1];}).map(function(x){return {id:String(x[0]),name:String(x[1]),k:x[2]==='x'?'x':'w'};});
+    db.pm={}; d.c.forEach(function(c,i){ var row=d.m[i]||[], r={}; d.k.forEach(function(k,j){ var v=+row[j]||0; if(v>0) r[String(k[0])]=v; }); db.pm[String(c[0])]=r; });
+  }
+  syncMatrix();
   if(d.lo===0||d.lo===1) db.loyOn=!!d.lo;
   if(d.ln>=2) db.loyN=Math.round(d.ln);
   if(d.lp>=1) db.loyPaid=Math.round(d.lp);
@@ -2237,7 +2425,7 @@ function openInvite(){
   if(!db.pin){ showSetup('pin','owner'); return; }
   var url=inviteUrl();
   $('invLink').value=url;
-  $('invInfo').textContent='Урилгад '+db.services.length+' төрөл, '+db.workers.length+' ажилтан орсон. Үнэ өөрчилсний дараа шинэ урилга үүсгэнэ үү.';
+  $('invInfo').textContent='Урилгад '+(db.cars.length?db.cars.length+' машины ангиллын үнэ, ':'')+db.services.filter(function(x){return !isM(x);}).length+' төрөл, '+db.workers.length+' ажилтан орсон. Үнэ өөрчилсний дараа шинэ урилга үүсгэнэ үү.';
   $('invQr').innerHTML='<div class="hint">QR код ачаалж байна…</div>';
   $('invite').hidden=false; window.scrollTo(0,0);
   loadQR().then(function(q){
@@ -2285,7 +2473,7 @@ resetForm(); exReset(); refreshAll(); applyRole(); checkJoinHash();
 </script>
 <script>
 (function(){
-  var APP_VER='2026-11-22b';
+  var APP_VER='2026-11-22c';
   var vd=document.createElement('div'); vd.className='hint'; vd.style.cssText='text-align:center;margin:4px 0 12px';
   vd.textContent='Аппын хувилбар: '+APP_VER;
   document.getElementById('p-set').appendChild(vd);

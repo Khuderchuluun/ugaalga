@@ -48,6 +48,7 @@ button:disabled{opacity:.6}
 .step .no{flex:none;width:30px;height:30px;border-radius:50%;background:var(--blue);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center}
 .step p{margin:3px 0 0}
 h2{font-size:18px;margin:0 0 12px}
+.csel{width:100%;font:inherit;font-size:17px;font-weight:700;padding:12px 14px;border:2px solid var(--line);border-radius:12px;background:#fff;color:var(--ink);margin-bottom:12px}
 .foot{text-align:center;color:var(--muted);font-size:13px;margin-top:18px}
 [hidden]{display:none!important}
 </style>
@@ -115,8 +116,13 @@ h2{font-size:18px;margin:0 0 12px}
     if(data.at) $('upd').textContent='Оноо сүүлд шинэчлэгдсэн: '+data.at;
   }
   function show(html){ var r=$('res'); r.innerHTML=html; r.hidden=false; r.scrollIntoView({behavior:'smooth',block:'start'}); }
-  function list(bal){
-    var svc=(data.svc||[]).filter(function(x){return x&&x.c>0;}), groups=[], by={};
+  var cur=null; /* {bal, car, raw} */
+  function list(bal,car){
+    var hasCar=(data.cars||[]).length>0;
+    var svc=(data.svc||[]).filter(function(x){return x&&x.c>0&&(typeof x.k!=='number'||x.k===car);})
+      .map(function(x){return typeof x.k==='number'?{n:x.g,g:'',c:x.c}:x;}), groups=[], by={};
+    if(hasCar&&car<0) return '<div class="hint" style="margin:0">Машины ангиллаа сонгоход үнэгүй угаалга бүрийн оноо гарна.</div>';
+    if(!svc.length) return '<div class="hint" style="margin:0">Мэдээлэл алга.</div>';
     svc.forEach(function(x){ var g=x.g||''; if(!(g in by)){ by[g]=[]; groups.push(g); } by[g].push(x); });
     return groups.map(function(g){
       var solo=by[g].length===1&&by[g][0].n===g;
@@ -128,6 +134,16 @@ h2{font-size:18px;margin:0 0 12px}
       }).join('');
     }).join('');
   }
+  function render(scroll){
+    var off=data.on===0, cars=data.cars||[];
+    var sel=cars.length?'<select class="csel" id="carSel" aria-label="Машины ангилал">'+(cur.car<0?'<option value="-1">Машины ангилал сонгох</option>':'')+
+      cars.map(function(n,i){return '<option value="'+i+'"'+(i===cur.car?' selected':'')+'>'+esc(n)+'</option>';}).join('')+'</select>':'';
+    var html='<div class="card bal"><div class="n">'+num(cur.bal)+'</div><div class="u">оноо</div><div class="pl">'+esc(cur.raw)+'</div></div>'+
+      (off?'<div class="card msg">Урамшуулал одоогоор түр зогссон байна.</div>':
+      '<div class="card"><h2>Үнэгүй авахад хэрэгтэй оноо</h2>'+sel+list(cur.bal,cur.car)+'</div>');
+    if(scroll) show(html); else $('res').innerHTML=html;
+  }
+  $('res').addEventListener('change',function(e){ if(e.target.id==='carSel'&&cur){ cur.car=+e.target.value; render(false); } });
   $('f').addEventListener('submit',function(e){
     e.preventDefault();
     var raw=$('pl').value, k=key(raw);
@@ -137,7 +153,7 @@ h2{font-size:18px;margin:0 0 12px}
     load().then(function(){
       var vs=variants(k);
       return Promise.all(vs.map(function(v){return sha16(data.s+'|'+v);})).then(function(hs){
-        for(var i=0;i<hs.length;i++) if(hs[i] in data.p) return {bal:+data.p[hs[i]]||0};
+        for(var i=0;i<hs.length;i++) if(hs[i] in data.p){ var v=data.p[hs[i]]; return Array.isArray(v)?{bal:+v[0]||0,car:+v[1]}:{bal:+v||0,car:-1}; }
         return null;
       });
     }).then(function(hit){
@@ -145,10 +161,8 @@ h2{font-size:18px;margin:0 0 12px}
         show('<div class="card msg"><b>Энэ дугаараар оноо олдсонгүй</b>Дугаараа зөв оруулсан эсэхээ шалгаарай. Саяхан анх удаа угаалгасан бол оноо тань дараагийн шинэчлэлтээр нэмэгдэнэ.</div>');
         return;
       }
-      var off=data.on===0;
-      show('<div class="card bal"><div class="n">'+num(hit.bal)+'</div><div class="u">оноо</div><div class="pl">'+esc(raw.trim().toUpperCase())+'</div></div>'+
-        (off?'<div class="card msg">Урамшуулал одоогоор түр зогссон байна.</div>':
-        '<div class="card"><h2>Үнэгүй авахад хэрэгтэй оноо</h2>'+list(hit.bal)+'</div>'));
+      cur={bal:hit.bal,car:(data.cars&&data.cars[hit.car])?hit.car:-1,raw:raw.trim().toUpperCase()};
+      render(true);
     }).catch(function(){
       show('<div class="card msg"><b>Мэдээлэл ачаалж чадсангүй</b>Интернэт холболтоо шалгаад дахин оролдоно уу.</div>');
     }).then(function(){ btn.disabled=false; });
