@@ -839,17 +839,6 @@ function recCands(r){
   var byName=db.cars.filter(function(c){return carTokens(c).some(function(t){return lab.indexOf(t)>=0;});}).map(function(c){return c.id;});
   return byName.length?byName:null;
 }
-/* Машины байж болох ангиллууд (бүртгэлүүдийн огтлолцол); тодорхойгүй бол null */
-function carCands(pk){
-  if(!db.cars.length) return null;
-  var set=null;
-  db.records.forEach(function(r){
-    if(r.del||plateKey(r.plate)!==pk) return;
-    var c=recCands(r); if(!c) return;
-    set=set?set.filter(function(x){return c.indexOf(x)>=0;}):c.slice();
-  });
-  return set&&set.length?set:null;
-}
 /* {id, sure}: sure=true бол ангилал бүртгэлд сонгогдсон, false бол таамаг */
 function carGuess(pk){
   var lc=lastCar(pk); if(lc) return {id:lc,sure:true};
@@ -2002,9 +1991,8 @@ function pubData(){
   var salt=Math.random().toString(36).slice(2,10)+Date.now().toString(36), now=new Date(), keys=Object.keys(by), p={};
   return Promise.all(keys.map(function(k){
     var L=loyalty(k); if(!L.total) return null;
-    var ids=db.cars.map(function(c){return c.id;}), lc=guessCar(k), ci=lc?ids.indexOf(lc):-1, cs=null;
-    if(ci<0){ cs=carCands(k); cs=cs?cs.map(function(x){return ids.indexOf(x);}).filter(function(x){return x>=0;}):null; if(cs&&!cs.length) cs=null; }
-    return sha16(salt+'|'+k).then(function(h){ p[h]=ci>=0?[L.bal,ci]:(cs?[L.bal,cs]:L.bal); });
+    var lc=guessCar(k), ci=lc?db.cars.map(function(c){return c.id;}).indexOf(lc):-1;
+    return sha16(salt+'|'+k).then(function(h){ p[h]=ci>=0?[L.bal,ci]:L.bal; });
   })).then(function(){
     return {v:1,at:dstr(now)+' '+tstr(now),rate:db.ptRate,paid:db.loyPaid,on:db.loyOn?1:0,s:salt,
       cars:db.cars.map(function(c){return c.name;}),
@@ -2526,7 +2514,7 @@ resetForm(); exReset(); refreshAll(); applyRole(); checkJoinHash();
 </script>
 <script>
 (function(){
-  var APP_VER='2026-11-22j';
+  var APP_VER='2026-11-22k';
   var vd=document.createElement('div'); vd.className='hint'; vd.style.cssText='text-align:center;margin:4px 0 12px';
   vd.textContent='Аппын хувилбар: '+APP_VER;
   document.getElementById('p-set').appendChild(vd);

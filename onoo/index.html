@@ -129,37 +129,39 @@ h2{font-size:18px;margin:0 0 12px}
   /* Хуудсанд харуулахгүй угаалга */
   var HIDE={'Дотор':1};
   var cur=null; /* {bal, car, raw} */
-  function rng(a,b){ return a===b?num(a):num(a)+'–'+num(b); }
-  /* set: машины байж болох ангиллууд ([] бол бүгд). Угаалга бүрт тэдгээрийн онооны хүрээ */
-  function list(bal,set){
-    var hasCar=(data.cars||[]).length>0, use=set.length?set:(data.cars||[]).map(function(n,i){return i;});
-    var rows=[], idx={};
-    (data.svc||[]).forEach(function(x){
-      if(!x||!(x.c>0)||HIDE[x.g]||HIDE[x.n]) return;
-      var key, name;
-      if(typeof x.k==='number'){ if(use.indexOf(x.k)<0) return; key='w:'+x.g; name=x.g; }
-      else{ key='s:'+(x.g||'')+':'+x.n; name=x.g&&x.n!==x.g?x.g+' · '+x.n:x.n; }
-      if(!(key in idx)){ idx[key]=rows.length; rows.push({n:name,lo:x.c,hi:x.c}); }
-      var r=rows[idx[key]]; r.lo=Math.min(r.lo,x.c); r.hi=Math.max(r.hi,x.c);
-    });
-    if(!rows.length) return '<div class="hint" style="margin:0">Мэдээлэл алга.</div>';
-    rows.sort(function(a,b){return a.lo-b.lo;});
-    var off=data.on===0;
-    return rows.map(function(x){
-      var ok=bal>=x.hi, maybe=!ok&&bal>=x.lo, pct=Math.min(100,Math.round(bal/x.lo*100));
-      return '<div class="it'+(ok&&!off?' ok':'')+'"><div class="r"><span class="nm">'+esc(x.n)+'</span><span class="pr">'+rng(x.lo,x.hi)+' оноо</span></div>'+
-        (off?'':'<div class="bar"><i style="width:'+pct+'%"></i></div>'+
-        '<div class="st">'+(ok?'✓ Үнэгүй авах боломжтой':maybe?'Машины ангиллаас хамаарч үнэгүй авах боломжтой — ажилтнаас асуугаарай':rng(x.lo-bal,x.hi-bal)+' оноо дутуу')+'</div>')+'</div>';
+  function list(bal,car){
+    var hasCar=(data.cars||[]).length>0;
+    var svc=(data.svc||[]).filter(function(x){return x&&x.c>0&&!HIDE[x.g]&&!HIDE[x.n]&&(typeof x.k!=='number'||x.k===car);})
+      .map(function(x){return typeof x.k==='number'?{n:x.g,g:'',c:x.c,pr:x.pr}:x;}), groups=[], by={};
+    if(hasCar&&car<0) return '<div class="hint" style="margin:0">Машины ангиллаа сонгоход үнэ болон үнэгүй угаалгын оноо гарна.</div>';
+    if(!svc.length) return '<div class="hint" style="margin:0">Мэдээлэл алга.</div>';
+    svc.forEach(function(x){ var g=x.g||''; if(!(g in by)){ by[g]=[]; groups.push(g); } by[g].push(x); });
+    return groups.map(function(g){
+      var solo=by[g].length===1&&by[g][0].n===g;
+      return (g&&!solo?'<div class="g">'+esc(g)+'</div>':'')+by[g].sort(function(a,b){return a.c-b.c;}).map(function(x){
+        var ok=bal>=x.c, pct=Math.min(100,Math.round(bal/x.c*100));
+        var off=data.on===0;
+        return '<div class="it'+(ok&&!off?' ok':'')+'"><div class="r"><span class="nm">'+esc(x.n)+'</span><span class="pr">'+num(x.c)+' оноо</span></div>'+
+          (off?'':'<div class="bar"><i style="width:'+pct+'%"></i></div>'+
+          '<div class="st">'+(ok?'✓ Үнэгүй авах боломжтой':num(x.c-bal)+' оноо дутуу')+'</div>')+'</div>';
+      }).join('');
     }).join('');
   }
+  /* Ангилал тодорхойгүй үед: бүх ангиллын угаалгын үнийг нэг хүснэгтээр */
+  function table(){
+    var cars=data.cars||[], cols=[], seen={};
+    (data.svc||[]).forEach(function(x){ if(typeof x.k==='number'&&!HIDE[x.g]&&!(x.g in seen)){ seen[x.g]=1; cols.push(x.g); } });
+    var pts=function(ci,g){ var it=(data.svc||[]).filter(function(x){return x.k===ci&&x.g===g;})[0]; return it&&it.c>0?num(it.c):'—'; };
+    return '<div style="overflow-x:auto"><table class="mt"><thead><tr><th>Ангилал</th>'+cols.map(function(g){return '<th>'+esc(g)+'</th>';}).join('')+'</tr></thead><tbody>'+
+      cars.map(function(n,ci){ return '<tr><td>'+esc(n)+'</td>'+cols.map(function(g){return '<td>'+pts(ci,g)+'</td>';}).join('')+'</tr>'; }).join('')+
+      '</tbody></table></div><div class="hint">Тухайн угаалгыг үнэгүй авахад хэрэгтэй оноо. Дараагийн удаа угаалгуулахад таны машины мэдээлэл энд шууд харагдана.</div>';
+  }
   function render(scroll){
-    var off=data.on===0, cars=data.cars||[];
-    var names=cur.set.map(function(i){return cars[i];}).filter(Boolean);
-    var sub=names.length?(names.length<=3?names.join(' / '):''):'';
+    var off=data.on===0, cars=data.cars||[], known=cur.car>=0||!cars.length;
     var html='<div class="card bal"><div class="n">'+num(cur.bal)+'</div><div class="u">оноо</div><div class="pl">'+esc(cur.raw)+'</div></div>'+
       (off?'<div class="card msg">Урамшуулал одоогоор түр зогссон байна.</div>':'')+
-      '<div class="card"><h2>Үнэгүй угаалгад хэрэгтэй оноо'+(sub?' · '+esc(sub):'')+'</h2>'+list(cur.bal,cur.set)+
-      (cars.length&&!names.length?'<div class="hint">Таны машины ангилал тодорхойгүй тул бүх ангиллын хүрээг харуулав. Дараагийн удаа угаалгуулахад таны машины оноо яг тодорхой гарна.</div>':'')+'</div>';
+      (known?'<div class="card"><h2>Үнэгүй угаалгад хэрэгтэй оноо'+(cars[cur.car]?' · '+esc(cars[cur.car]):'')+'</h2>'+list(cur.bal,cur.car)+'</div>':
+        '<div class="card"><h2>Үнэгүй угаалгад хэрэгтэй оноо</h2>'+table()+'</div>');
     if(scroll) show(html); else $('res').innerHTML=html;
   }
   $('f').addEventListener('submit',function(e){
@@ -171,7 +173,7 @@ h2{font-size:18px;margin:0 0 12px}
     load().then(function(){
       var vs=variants(k);
       return Promise.all(vs.map(function(v){return sha16(data.s+'|'+v);})).then(function(hs){
-        for(var i=0;i<hs.length;i++) if(hs[i] in data.p){ var v=data.p[hs[i]]; return Array.isArray(v)?{bal:+v[0]||0,car:v[1]}:{bal:+v||0,car:-1}; }
+        for(var i=0;i<hs.length;i++) if(hs[i] in data.p){ var v=data.p[hs[i]]; return Array.isArray(v)?{bal:+v[0]||0,car:+v[1]}:{bal:+v||0,car:-1}; }
         return null;
       });
     }).then(function(hit){
@@ -179,10 +181,7 @@ h2{font-size:18px;margin:0 0 12px}
         show('<div class="card msg"><b>Энэ дугаараар оноо олдсонгүй</b>Дугаараа зөв оруулсан эсэхээ шалгаарай. Саяхан анх удаа угаалгасан бол оноо тань дараагийн шинэчлэлтээр нэмэгдэнэ.</div>');
         return;
       }
-      var nc=(data.cars||[]).length, cc=hit.car;
-      /* car: ангиллын индексүүдийн жагсаалт ([] = тодорхойгүй) */
-      var set=Array.isArray(cc)?cc.filter(function(i){return i>=0&&i<nc;}):((typeof cc==='number'&&cc>=0&&cc<nc)?[cc]:[]);
-      cur={bal:hit.bal,set:set,raw:raw.trim().toUpperCase()};
+      cur={bal:hit.bal,car:(data.cars&&data.cars[hit.car])?hit.car:-1,raw:raw.trim().toUpperCase()};
       render(true);
     }).catch(function(){
       show('<div class="card msg"><b>Мэдээлэл ачаалж чадсангүй</b>Интернэт холболтоо шалгаад дахин оролдоно уу.</div>');
