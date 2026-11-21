@@ -1957,7 +1957,7 @@ function pubData(){
     return {v:1,at:dstr(now)+' '+tstr(now),rate:db.ptRate,paid:db.loyPaid,on:db.loyOn?1:0,s:salt,
       cars:db.cars.map(function(c){return c.name;}),
       svc:db.services.filter(function(x){return (+x.price||0)>0;}).map(function(x){var o={n:x.name,g:x.g||'',c:ptCost(x.price),pr:+x.price}; if(isM(x)){ o.k=db.cars.map(function(c){return c.id;}).indexOf(x.c); } return o;}),
-      xs:db.extras.filter(function(x){return (+x.price||0)>0;}).map(function(x){var o={n:isM(x)?x.g:svcLabel(x),pr:+x.price}; if(isM(x)){ o.k=db.cars.map(function(c){return c.id;}).indexOf(x.c); } return o;}),p:p};
+      p:p};
   });
 }
 function b64utf8(s){ var b=new TextEncoder().encode(s), out=''; for(var i=0;i<b.length;i+=0x8000) out+=String.fromCharCode.apply(null,b.subarray(i,i+0x8000)); return btoa(out); }
@@ -2474,7 +2474,7 @@ resetForm(); exReset(); refreshAll(); applyRole(); checkJoinHash();
 </script>
 <script>
 (function(){
-  var APP_VER='2026-11-22d';
+  var APP_VER='2026-11-22e';
   var vd=document.createElement('div'); vd.className='hint'; vd.style.cssText='text-align:center;margin:4px 0 12px';
   vd.textContent='Аппын хувилбар: '+APP_VER;
   document.getElementById('p-set').appendChild(vd);

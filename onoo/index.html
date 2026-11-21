@@ -141,11 +141,6 @@ h2{font-size:18px;margin:0 0 12px}
       }).join('');
     }).join('');
   }
-  function extras(car){
-    var xs=(data.xs||[]).filter(function(x){return x&&x.pr>0&&(typeof x.k!=='number'||x.k===car);});
-    if(!xs.length||((data.cars||[]).length&&car<0)) return '';
-    return '<div class="sub2">Нэмэлт үйлчилгээ</div>'+xs.map(function(x){return '<div class="xr"><span>'+esc(x.n)+'</span><b>+'+num(x.pr)+'₮</b></div>';}).join('');
-  }
   function render(scroll){
     var off=data.on===0, cars=data.cars||[];
     var sel=cars.length?'<select class="csel" id="carSel" aria-label="Машины ангилал">'+(cur.car<0?'<option value="-1">Машины ангилал сонгох</option>':'')+
@@ -153,7 +148,7 @@ h2{font-size:18px;margin:0 0 12px}
     var priced=(data.svc||[]).some(function(x){return x&&x.pr>0;});
     var html='<div class="card bal"><div class="n">'+num(cur.bal)+'</div><div class="u">оноо</div><div class="pl">'+esc(cur.raw)+'</div></div>'+
       (off?'<div class="card msg">Урамшуулал одоогоор түр зогссон байна.</div>':'')+
-      '<div class="card"><h2>'+(priced?'Таны машины үнэ':'Үнэгүй авахад хэрэгтэй оноо')+'</h2>'+sel+list(cur.bal,cur.car)+extras(cur.car)+'</div>';
+      '<div class="card"><h2>'+(priced?'Таны машины үнэ':'Үнэгүй авахад хэрэгтэй оноо')+'</h2>'+sel+list(cur.bal,cur.car)+'</div>';
     if(scroll) show(html); else $('res').innerHTML=html;
   }
   $('res').addEventListener('change',function(e){ if(e.target.id==='carSel'&&cur){ cur.car=+e.target.value; render(false); } });
