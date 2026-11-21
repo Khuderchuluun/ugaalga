@@ -91,7 +91,7 @@ h2{font-size:18px;margin:0 0 12px}
   </div>
 
   <div class="foot" id="upd"></div>
-  <div class="foot">Оноо хугацаа дуусахгүй. Бүтэн, Гадар, Дотор, Өөрөө угаах — аль нэгнийх нь оноо хүрмэгц тэр угаалгыг үнэгүй авна.</div>
+  <div class="foot">Оноо хугацаа дуусахгүй. Бүтэн, Гадар, Өөрөө угаах — аль нэгнийх нь оноо хүрмэгц тэр угаалгыг үнэгүй авна.</div>
 </div>
 
 <script>
@@ -126,10 +126,12 @@ h2{font-size:18px;margin:0 0 12px}
     if(data.at) $('upd').textContent='Оноо сүүлд шинэчлэгдсэн: '+data.at;
   }
   function show(html){ var r=$('res'); r.innerHTML=html; r.hidden=false; r.scrollIntoView({behavior:'smooth',block:'start'}); }
+  /* Хуудсанд харуулахгүй угаалга */
+  var HIDE={'Дотор':1};
   var cur=null; /* {bal, car, raw} */
   function list(bal,car){
     var hasCar=(data.cars||[]).length>0;
-    var svc=(data.svc||[]).filter(function(x){return x&&x.c>0&&(typeof x.k!=='number'||x.k===car);})
+    var svc=(data.svc||[]).filter(function(x){return x&&x.c>0&&!HIDE[x.g]&&!HIDE[x.n]&&(typeof x.k!=='number'||x.k===car);})
       .map(function(x){return typeof x.k==='number'?{n:x.g,g:'',c:x.c,pr:x.pr}:x;}), groups=[], by={};
     if(hasCar&&car<0) return '<div class="hint" style="margin:0">Машины ангиллаа сонгоход үнэ болон үнэгүй угаалгын оноо гарна.</div>';
     if(!svc.length) return '<div class="hint" style="margin:0">Мэдээлэл алга.</div>';
@@ -148,7 +150,7 @@ h2{font-size:18px;margin:0 0 12px}
   /* Ангилал тодорхойгүй үед: бүх ангиллын угаалгын үнийг нэг хүснэгтээр */
   function table(){
     var cars=data.cars||[], cols=[], seen={};
-    (data.svc||[]).forEach(function(x){ if(typeof x.k==='number'&&!(x.g in seen)){ seen[x.g]=1; cols.push(x.g); } });
+    (data.svc||[]).forEach(function(x){ if(typeof x.k==='number'&&!HIDE[x.g]&&!(x.g in seen)){ seen[x.g]=1; cols.push(x.g); } });
     var pts=function(ci,g){ var it=(data.svc||[]).filter(function(x){return x.k===ci&&x.g===g;})[0]; return it&&it.c>0?num(it.c):'—'; };
     return '<div style="overflow-x:auto"><table class="mt"><thead><tr><th>Ангилал</th>'+cols.map(function(g){return '<th>'+esc(g)+'</th>';}).join('')+'</tr></thead><tbody>'+
       cars.map(function(n,ci){ return '<tr><td>'+esc(n)+'</td>'+cols.map(function(g){return '<td>'+pts(ci,g)+'</td>';}).join('')+'</tr>'; }).join('')+
