@@ -189,6 +189,8 @@ h2{font-size:18px;margin:0 0 12px}
   /* Талбар үргэлж хоосон: өмнө хадгалсан дугаарыг устгана */
   try{ localStorage.removeItem('onoo_pl'); }catch(x){}
   $('pl').value='';
+  /* iPhone Safari хуудсыг санахаасаа (буцах товч, апп солих) сэргээхэд ч хоосон байлгана */
+  window.addEventListener('pageshow',function(e){ if(e.persisted){ $('pl').value=''; $('res').hidden=true; $('res').innerHTML=''; } });
   load().catch(function(){});
 })();
 </script>
